@@ -1,0 +1,32 @@
+YEEDI V5 FINAL 30-SECOND FLOW
+
+MERCHANT / YEEDI BACKEND
+  -> POST Create Payment (₹500, merchant_order_id)
+  -> SERVER CORE reserves receiving-account/amount slot
+  -> returns payment_id + public_token + QR/UPI
+
+CUSTOMER DASHBOARD
+  -> Customer pays ₹500
+  -> taps I HAVE PAID
+  -> POST acknowledge(payment_id, token)
+  -> SERVER saves customer_ack_at (IDEMPOTENT)
+  -> UI VERIFYING 30s + 2s status polling
+  -> after 30s without SMS: WAITING_BANK_SMS, NOT FAILED
+  -> continues polling about every 3s
+
+BANK SIM PHONE
+  -> Bank CREDIT SMS arrives
+  -> ANDROID parser extracts bank + ₹500 + UTR/RRN + account-last4 + sender + received_at
+  -> signed HMAC POST to SERVER webhook
+  -> WorkManager retries transient upload failures
+
+SERVER MATCHER
+  -> validates device/signature/sender/account/reference
+  -> exact bank + account + amount + valid window
+  -> exactly 1 candidate => SUCCESS
+  -> 0 => UNMATCHED
+  -> >1 => AMBIGUOUS / REVIEW_REQUIRED
+
+CUSTOMER DASHBOARD NEXT POLL
+  -> SUCCESS + UTR + delivery_ready=true
+  -> delivery/service release allowed

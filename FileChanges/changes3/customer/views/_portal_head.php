@@ -1,0 +1,6 @@
+<?php $title=$title??'Customer Portal';$nav=$nav??''; ?>
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title><?=e($title)?> — YEEDIPAY</title><link rel="stylesheet" href="<?=e(asset_url('app.css'))?>"></head>
+<body class="cust-shell"><div class="cust-layout"><aside class="cust-side"><div class="cust-brand">YEEDIPAY<br><small style="color:#999;font-weight:500"><?=e($c['code']??'')?></small></div><nav class="cust-nav">
+<?php $items=['dashboard'=>['Dashboard','/c/'.$c['code']],'merchant_qr'=>['Merchant QR','/c/'.$c['code'].'/qr'],'statement'=>['Statement','/c/'.$c['code'].'/statement'],'billing'=>['Billing & GST','/c/'.$c['code'].'/billing'],'wallet'=>['Wallet','/c/'.$c['code'].'/wallet'],'tickets'=>['Support','/c/'.$c['code'].'/tickets']];foreach($items as $key=>$it): ?><a class="cust-nav-link <?=$nav===$key?'is-on':''?>" href="<?=e(url($it[1]))?>"><?=e($it[0])?></a><?php endforeach; ?>
+<a class="cust-nav-link" href="<?=e(url('/c/'.$c['code'].'/logout'))?>">Logout</a></nav></aside><main class="cust-main">
+<?php foreach(($flashes??[]) as $f): ?><div class="<?=e($f['type'])?>"><?=e($f['message'])?></div><?php endforeach; ?>

@@ -1,0 +1,20 @@
+{
+    "logs": [
+        {
+            "outputFile": "in.yeedipay.bankrelay.app-mergeDebugResources-27:/values-hdpi-v4/values-hdpi-v4.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\HP\\AppData\\Local\\Temp\\cursor-sandbox-cache\\126d58f6c2e3d26b35acfaf560a7115c\\gradle\\caches\\9.2.0\\transforms\\4172d8fb6bdb8b04c23161a7fc3d529b\\workspace\\transformed\\appcompat-1.8.0\\res\\values-hdpi-v4\\values-hdpi-v4.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endLines": "6",
+                        "endColumns": "13",
+                        "endOffsets": "327"
+                    }
+                }
+            ]
+        }
+    ]
+}

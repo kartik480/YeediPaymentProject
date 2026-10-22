@@ -1,0 +1,37 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'in.yeedipay.bankrelay'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'in.yeedipay.bankrelay'
+        minSdk 26
+        targetSdk 36
+        versionCode 4
+        versionName '1.2.1'
+
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.8.0'
+    implementation 'androidx.work:work-runtime:2.12.0'
+
+    testImplementation 'junit:junit:4.13.2'
+}

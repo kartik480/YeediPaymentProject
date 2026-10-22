@@ -1,0 +1,5 @@
+<?php include __DIR__.'/_portal_head.php'; ?>
+<h1 class="col-title"><?=e($ticket['reference'])?> — <?=e($ticket['subject'])?></h1><?php if(!empty($error)): ?><div class="error"><?=e($error)?></div><?php endif; ?>
+<div class="col-panel"><p><b>Status:</b> <?=e($ticket['status'])?> · <b>Category:</b> <?=e($ticket['category'])?></p><?php foreach($replies as$r): ?><div class="ticket-reply"><div class="ticket-reply-meta"><?=e($r['sender_type'])?> · <?=e($r['sender_name'])?> · <?=e(BankSmsService::formatLocal((string)$r['created_at']))?></div><div><?=nl2br(e($r['message']))?></div></div><?php endforeach; ?></div>
+<div class="col-panel"><form method="post" action="<?=e(url('/c/'.$c['code'].'/tickets/'.$ticket['id'].'/reply'))?>"><?=csrf_field()?><label>Reply<textarea name="message" required style="width:100%;min-height:120px;background:#111;color:#fff;border:1px solid #333;border-radius:8px;padding:12px"></textarea></label><div style="margin-top:12px"><button class="col-btn-gold">SEND REPLY</button> <a class="col-btn-gray" href="<?=e(url('/c/'.$c['code'].'/tickets'))?>">Back</a></div></form></div>
+<?php include __DIR__.'/_portal_foot.php'; ?>

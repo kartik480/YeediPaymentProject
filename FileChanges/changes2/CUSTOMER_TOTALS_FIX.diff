@@ -1,0 +1,138 @@
+--- /mnt/data/v2/ADC_SMS_MATCH_UNIQUE_PAISE_V2/app/TransactionService.php	2026-09-30 11:20:03.000000000 +0000
++++ /mnt/data/YEEDIPAY_CUSTOMER_TOTALS_FIX_PATCH/PATCH_FILES/app/TransactionService.php	2026-10-01 03:54:55.293995958 +0000
+@@ -343,19 +343,30 @@
+     /** @return array{confirmed:float,pending:float,refunded:float,settled:float,ledger_balance:float} */
+     public static function collectionTotals(PDO $db, int $customerId): array {
+         self::ensureSchema($db);
++
++        // IMPORTANT ACCOUNTING RULES:
++        // 1) PENDING is only a pending collection; it does not change ledger balance.
++        // 2) FAILED / EXPIRED are failed attempts, NOT refunds.
++        // 3) Only SUCCESS contributes to confirmed collections.
++        // 4) A SUCCESS transaction marked SETTLED is debited from customer ledger balance.
++        // 5) This build has no dedicated bank-confirmed refund ledger table, therefore refunded=0.
++        //    When a real refund ledger is introduced, read only bank-confirmed refund entries there.
+         $st = $db->prepare("SELECT
+             COALESCE(SUM(CASE WHEN status='SUCCESS' THEN COALESCE(confirmed_amount,requested_amount,0) ELSE 0 END),0) confirmed,
+             COALESCE(SUM(CASE WHEN status='PENDING' THEN COALESCE(requested_amount,0) ELSE 0 END),0) pending,
+-            COALESCE(SUM(CASE WHEN status='FAILED' THEN COALESCE(requested_amount,confirmed_amount,0) ELSE 0 END),0) refunded,
+             COALESCE(SUM(CASE WHEN status='SUCCESS' AND COALESCE(settlement_status,'UNSETTLED')='SETTLED' THEN COALESCE(confirmed_amount,requested_amount,0) ELSE 0 END),0) settled
+-            FROM transactions WHERE customer_id=?");
++            FROM transactions
++            WHERE customer_id=?");
+         $st->execute([$customerId]);
+         $row = $st->fetch() ?: [];
+-        $confirmed = (float)($row['confirmed'] ?? 0);
+-        $pending = (float)($row['pending'] ?? 0);
+-        $refunded = (float)($row['refunded'] ?? 0);
+-        $settled = (float)($row['settled'] ?? 0);
+-        $ledger = max(0, round($confirmed - $settled - $refunded, 2));
++
++        // Round monetary totals at the reporting boundary.
++        $confirmed = round((float)($row['confirmed'] ?? 0), 2);
++        $pending = round((float)($row['pending'] ?? 0), 2);
++        $refunded = 0.00;
++        $settled = round((float)($row['settled'] ?? 0), 2);
++        $ledger = round($confirmed - $settled - $refunded, 2);
++
+         return [
+             'confirmed' => $confirmed,
+             'pending' => $pending,
+--- /mnt/data/v2/ADC_SMS_MATCH_UNIQUE_PAISE_V2/app/SuperAdminService.php	2026-09-30 11:20:03.000000000 +0000
++++ /mnt/data/YEEDIPAY_CUSTOMER_TOTALS_FIX_PATCH/PATCH_FILES/app/SuperAdminService.php	2026-10-01 03:54:55.294170081 +0000
+@@ -21,11 +21,12 @@
+             $todayPending = (float)($row['pending_amt'] ?? 0);
+             $todaySuccess = (float)($row['success_amt'] ?? 0);
+         }
+-        $ledger = (float)$db->query("SELECT COALESCE(SUM(COALESCE(confirmed_amount,requested_amount,0)),0) FROM transactions WHERE status='SUCCESS'")->fetchColumn();
++        $ledgerStats = self::customerAccountStats($db);
++        $ledger = (float)($ledgerStats['ledger_balance'] ?? 0);
+         $bank = BankService::active($db);
+         $bankName = trim((string)($bank['bank_name'] ?? ''));
+         if ($bankName === '') $bankName = 'No active bank';
+-        $mode = $bankName.' / UPI static QR + manual bank confirmation';
++        $mode = $bankName.' / I HAVE PAID + Android Bank SMS Relay + exact amount/account/UTR match';
+         return [
+             'today_attempts' => $todayAttempts,
+             'today_pending' => $todayPending,
+@@ -39,7 +40,13 @@
+     public static function customerAccounts(PDO $db): array {
+         TransactionService::ensureSchema($db);
+         return $db->query("SELECT c.*,
+-            COALESCE(SUM(CASE WHEN t.status='SUCCESS' THEN COALESCE(t.confirmed_amount,t.requested_amount,0) ELSE 0 END),0) ledger_balance,
++            COALESCE(SUM(CASE WHEN t.status='SUCCESS' THEN COALESCE(t.confirmed_amount,t.requested_amount,0) ELSE 0 END),0) confirmed_amount_total,
++            COALESCE(SUM(CASE WHEN t.status='PENDING' THEN COALESCE(t.requested_amount,0) ELSE 0 END),0) pending_amount_total,
++            COALESCE(SUM(CASE WHEN t.status='SUCCESS' AND COALESCE(t.settlement_status,'UNSETTLED')='SETTLED' THEN COALESCE(t.confirmed_amount,t.requested_amount,0) ELSE 0 END),0) settled_amount_total,
++            ROUND(
++                COALESCE(SUM(CASE WHEN t.status='SUCCESS' THEN COALESCE(t.confirmed_amount,t.requested_amount,0) ELSE 0 END),0)
++                - COALESCE(SUM(CASE WHEN t.status='SUCCESS' AND COALESCE(t.settlement_status,'UNSETTLED')='SETTLED' THEN COALESCE(t.confirmed_amount,t.requested_amount,0) ELSE 0 END),0)
++            ,2) ledger_balance,
+             COUNT(t.id) txn_count
+             FROM customers c
+             LEFT JOIN transactions t ON t.customer_id=c.id
+@@ -55,15 +62,20 @@
+         $row = $db->query("SELECT
+             COALESCE(SUM(CASE WHEN status='SUCCESS' THEN COALESCE(confirmed_amount,requested_amount,0) ELSE 0 END),0) confirmed,
+             COALESCE(SUM(CASE WHEN status='PENDING' THEN COALESCE(requested_amount,0) ELSE 0 END),0) pending,
+-            COALESCE(SUM(CASE WHEN status='FAILED' THEN COALESCE(requested_amount,confirmed_amount,0) ELSE 0 END),0) refunded,
+             COALESCE(SUM(CASE WHEN status='SUCCESS' AND COALESCE(settlement_status,'UNSETTLED')='SETTLED' THEN COALESCE(confirmed_amount,requested_amount,0) ELSE 0 END),0) settled
+             FROM transactions")->fetch() ?: [];
+-        $ledger = (float)($row['confirmed'] ?? 0);
++
++        $confirmed = round((float)($row['confirmed'] ?? 0), 2);
++        $pending = round((float)($row['pending'] ?? 0), 2);
++        $refunded = 0.00; // FAILED/EXPIRED are not refunds.
++        $settled = round((float)($row['settled'] ?? 0), 2);
++        $ledger = round($confirmed - $settled - $refunded, 2);
++
+         return [
+-            'confirmed' => (float)($row['confirmed'] ?? 0),
+-            'pending' => (float)($row['pending'] ?? 0),
+-            'refunded' => (float)($row['refunded'] ?? 0),
+-            'settled' => (float)($row['settled'] ?? 0),
++            'confirmed' => $confirmed,
++            'pending' => $pending,
++            'refunded' => $refunded,
++            'settled' => $settled,
+             'ledger_balance' => $ledger,
+         ];
+     }
+--- /mnt/data/v2/ADC_SMS_MATCH_UNIQUE_PAISE_V2/customer/views/dashboard.php	2026-09-29 17:10:26.000000000 +0000
++++ /mnt/data/YEEDIPAY_CUSTOMER_TOTALS_FIX_PATCH/PATCH_FILES/customer/views/dashboard.php	2026-10-01 03:54:55.294259015 +0000
+@@ -15,6 +15,7 @@
+ ?>
+ <div class="pay dash col-dash">
+     <h1 class="col-title">Collections</h1>
++    <p class="col-note"><b>Account totals below are all-time totals.</b> The Status/Period/From/To filters apply to Transaction Status History and exports only.</p>
+ 
+     <div class="col-stats">
+         <div class="col-stat">
+@@ -40,7 +41,7 @@
+     </div>
+ 
+     <div class="col-panel col-statement">
+-        <p class="col-note">Ledger Balance = confirmed successful collections + approved credits − refunds − settlements − debit adjustments. It is your YEEDIPAY statement balance, not a direct live bank-balance feed.</p>
++        <p class="col-note">Ledger Balance = bank-confirmed SUCCESS collections − SETTLED payouts. PENDING, FAILED and EXPIRED attempts do not change the ledger. FAILED is not treated as a refund. This is a YEEDIPAY internal ledger, not the pooled bank account live balance.</p>
+         <a class="col-btn-gold" href="<?=e(url('/c/'.$c['code'].'/statement'))?>">VIEW ACCOUNT STATEMENT</a>
+     </div>
+ 
+--- /mnt/data/v2/ADC_SMS_MATCH_UNIQUE_PAISE_V2/customer/views/statement.php	2026-09-29 03:03:06.000000000 +0000
++++ /mnt/data/YEEDIPAY_CUSTOMER_TOTALS_FIX_PATCH/PATCH_FILES/customer/views/statement.php	2026-10-01 03:54:55.294315310 +0000
+@@ -46,7 +46,7 @@
+                 <a class="col-btn-gray" href="<?=e(url('/c/'.$c['code'].'/statement.pdf'.$exportQs))?>">PDF</a>
+             </div>
+         </form>
+-        <p class="col-note stmt-note">Only SUCCESS payments create credits. PENDING and FAILED attempts do not increase this balance.</p>
++        <p class="col-note stmt-note">Only bank-confirmed SUCCESS payments create credits. SETTLED payouts create debits. PENDING, FAILED and EXPIRED attempts do not change this balance; FAILED is never treated as a refund.</p>
+     </div>
+ 
+     <div class="col-panel col-history">
+--- /mnt/data/v2/ADC_SMS_MATCH_UNIQUE_PAISE_V2/super-admin/views/customer_accounts.php	2026-09-29 03:03:04.000000000 +0000
++++ /mnt/data/YEEDIPAY_CUSTOMER_TOTALS_FIX_PATCH/PATCH_FILES/super-admin/views/customer_accounts.php	2026-10-01 03:54:55.294357313 +0000
+@@ -49,5 +49,5 @@
+         <?php endif; ?>
+     </table>
+ </div>
+-<p class="sa-note">Ledger balance is the total SUCCESS amount recorded for each customer in YEEDIPAY.</p>
++<p class="sa-note">Ledger balance = bank-confirmed SUCCESS collections − SETTLED payouts. PENDING/FAILED/EXPIRED do not change balance, and FAILED is not a refund.</p>
+ <?php include __DIR__.'/_super_foot.php'; ?>

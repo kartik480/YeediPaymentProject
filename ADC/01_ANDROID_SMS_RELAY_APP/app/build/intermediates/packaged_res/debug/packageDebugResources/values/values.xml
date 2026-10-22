@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">YEEDI Bank SMS Relay</string>
+    <style name="Theme.YeediBankRelay" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+    </style>
+</resources>

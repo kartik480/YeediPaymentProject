@@ -1,0 +1,48 @@
+YEEDIPAY ADC — CURRENT FLOW CHANGESET
+Version: SMS_MATCH_CURRENT_FLOW_FINAL_2026-09-30
+
+LOCKED FLOW
+Customer amount -> QR -> payment -> I HAVE PAID -> 30-sec checking -> Bank UPI CREDIT SMS -> Android Relay -> exact amount + receiving account last-4 + valid unique UTR/RRN -> SUCCESS -> UTR display -> service release.
+
+PRIMARY REPLACEMENT FILES
+app/BankSmsService.php
+app/ReconciliationService.php
+app/PaymentConfirmService.php
+app/TransactionService.php
+app/WalletService.php
+app/SmsService.php
+customer/public/index.php
+admin/public/index.php
+super-admin/public/index.php
+admin/views/banks.php
+admin/views/bank_sms.php
+admin/views/payout_flow.php
+android_sms_relay/app/src/main/java/in/yeedipay/bankrelay/BankSmsParser.java
+android_sms_relay/app/src/main/java/in/yeedipay/bankrelay/UploadWorker.java
+android_sms_relay/app/src/test/java/in/yeedipay/bankrelay/BankSmsParserTest.java
+bin/migrate.php
+database/schema.sql
+database/migrate_platform_updates.sql
+DEVELOPER_DEPLOYMENT_GUIDE_TELUGU.md
+README.md
+FINAL_QA_REPORT.md
+docs/DEVELOPER_GUIDE.md
+docs/FUNCTION_MATRIX.md
+docs/GO_LIVE_CHECKLIST.md
+VERSION.txt
+
+REMOVE FROM APPLICATION SOURCE DURING PATCH INSTALL
+database/migrate_utr_screenshot.sql
+database/sample_reconciliation.csv
+
+DO NOT DELETE
+Live server .env
+Live storage/backups
+Database data
+Android signing keystore
+
+AFTER COPY
+php bin/migrate.php
+php bin/sms_match_preflight.php
+
+Then perform all live tests in DEVELOPER_DEPLOYMENT_GUIDE_TELUGU.md.

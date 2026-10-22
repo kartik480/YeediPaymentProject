@@ -1,0 +1,26 @@
+Parser/UAT examples only — replace/add real messages captured from the dedicated bank phone.
+This V5 relay auto-confirms UPI/QR credits only. Non-UPI credits are intentionally ignored.
+
+ICICI positive:
+A/c XX1234 credited with Rs.500.00. UPI Ref No 627032899714. ICICI Bank
+Rs.250.00 received in A/c XX1234 via UPI. UTR 627032899714.
+Payment received via UPI in A/c XX1234 for Rs.75.00. UPI Ref No 627032899716.
+
+IndusInd positive:
+A/c XX3456 credited with INR 700.00 via UPI. UPI Ref No 627032899715.
+
+RBL positive:
+Your A/c XX2222 is credited with INR 1250.00 via UPI/627032899714/RAO.
+
+MUST BE IGNORED:
+OTP 123456 for transaction of Rs 500. Do not share your OTP.
+A/c XX2222 debited by INR 1000.00. Ref No 123456789012
+Your payment request received. A/c XX2222 debited by INR 1000.00. UPI Ref No 123456789012.
+UPI collect request received for Rs.500.00 on A/c XX1234. UPI Ref No 627032899714.
+You have received a request to pay Rs.500.00 from ABC. A/c XX1234. UPI Ref No 627032899714.
+A/c XX1234 will be credited with Rs.500.00. UPI Ref No 627032899714.
+Refund of Rs.500.00 will be credited to A/c XX1234. UPI Ref No 627032899714.
+A/c XX1234 credited back with Rs.500.00 due to failed UPI txn. UPI Ref No 627032899714.
+UPI transaction pending. A/c XX1234 credited with Rs.500.00 after settlement. UPI Ref No 627032899714.
+Cashback credited to A/c XX1234 for Rs.500.00 via UPI. UPI Ref No 627032899714.
+A/c XX1234 credited with Rs.500.00. NEFT Ref No ABCD1234567890.

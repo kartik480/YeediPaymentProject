@@ -1,0 +1,20 @@
+{
+    "logs": [
+        {
+            "outputFile": "in.yeedipay.bankrelay.app-mergeDebugResources-27:/values-watch-v21/values-watch-v21.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\HP\\AppData\\Local\\Temp\\cursor-sandbox-cache\\126d58f6c2e3d26b35acfaf560a7115c\\gradle\\caches\\9.2.0\\transforms\\4172d8fb6bdb8b04c23161a7fc3d529b\\workspace\\transformed\\appcompat-1.8.0\\res\\values-watch-v21\\values-watch-v21.xml",
+                    "from": {
+                        "startLines": "2,6,10",
+                        "startColumns": "4,4,4",
+                        "startOffsets": "55,271,499",
+                        "endLines": "5,9,13",
+                        "endColumns": "12,12,12",
+                        "endOffsets": "266,494,724"
+                    }
+                }
+            ]
+        }
+    ]
+}

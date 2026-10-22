@@ -1,0 +1,23 @@
+# Go-Live Checklist — ADC Current Flow
+
+- [ ] Production `.env` configured; no secrets committed into source.
+- [ ] `SESSION_COOKIE_SECURE=true` behind HTTPS.
+- [ ] `php bin/migrate.php` completed.
+- [ ] `php bin/sms_match_preflight.php` returns `PREFLIGHT PASS`.
+- [ ] Android release APK signed with organisation key.
+- [ ] Relay endpoint is HTTPS.
+- [ ] Device ID and secret match Admin-created device.
+- [ ] Every receiving bank/account has correct last-4 mapping.
+- [ ] Real bank CREDIT SMS contains UPI context, exact amount, account last-4 and UTR/RRN.
+- [ ] Correct-payment live test reaches SUCCESS.
+- [ ] Missing UTR does not reach SUCCESS.
+- [ ] Missing/wrong account last-4 does not reach SUCCESS.
+- [ ] Wrong amount does not reach SUCCESS.
+- [ ] Reused UTR is rejected.
+- [ ] No I HAVE PAID acknowledgement means no SUCCESS.
+- [ ] Delayed SMS changes waiting payment to SUCCESS when it later matches.
+- [ ] Same-amount collision does not auto-confirm.
+- [ ] Debit/OTP/collect/refund/reversal SMS is ignored.
+- [ ] Replayed nonce is rejected.
+- [ ] Customer sees bank UTR/RRN after SUCCESS.
+- [ ] Service is released only after SUCCESS.

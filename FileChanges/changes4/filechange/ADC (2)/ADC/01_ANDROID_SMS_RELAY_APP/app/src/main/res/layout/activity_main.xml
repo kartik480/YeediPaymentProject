@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="YEEDI Bank SMS Relay"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/statusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Status"
+            android:textSize="16sp" />
+
+        <EditText
+            android:id="@+id/endpointInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:hint="https://customer.yeedipay.in/api/bank-relay/webhook_bank_sms.php"
+            android:inputType="textUri" />
+
+        <EditText
+            android:id="@+id/deviceIdInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Device ID"
+            android:inputType="text" />
+
+        <EditText
+            android:id="@+id/secretInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Device API Secret"
+            android:inputType="textPassword" />
+
+        <EditText
+            android:id="@+id/iciciLast4Input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="ICICI last4: 1234 or 1234,5678"
+            android:inputType="text" />
+
+        <EditText
+            android:id="@+id/indusindLast4Input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="IndusInd last4: 1234 or 1234,5678"
+            android:inputType="text" />
+
+        <EditText
+            android:id="@+id/rblLast4Input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="RBL last4: 1234 or 1234,5678"
+            android:inputType="text" />
+
+        <Button
+            android:id="@+id/saveButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Save Configuration" />
+
+        <Button
+            android:id="@+id/permissionButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Allow Bank SMS Access" />
+
+        <Button
+            android:id="@+id/testButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Send Safe Test Event" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Only CREDIT transaction metadata is sent. Raw SMS text is never uploaded. Actual OTP-code messages are discarded on the phone."
+            android:textSize="14sp" />
+
+    </LinearLayout>
+</ScrollView>

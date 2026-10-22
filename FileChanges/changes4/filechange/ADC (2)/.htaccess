@@ -1,0 +1,26 @@
+DirectoryIndex index.php
+DirectorySlash Off
+
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteBase /
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+# Only real public assets are served as files. /admin and /super-admin are app routes.
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteCond %{REQUEST_URI} ^/(admin/public|customer/public|super-admin/public|image|video)/
+RewriteRule ^ - [L]
+
+RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+<FilesMatch "^\.env">
+<IfModule mod_authz_core.c>
+Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+Order allow,deny
+Deny from all
+</IfModule>
+</FilesMatch>

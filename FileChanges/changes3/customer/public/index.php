@@ -1,0 +1,101 @@
+<?php
+declare(strict_types=1);
+if(!defined('YEEDIPAY_SURFACE'))define('YEEDIPAY_SURFACE','customer');
+require_once __DIR__.'/../../app/bootstrap.php';
+
+function portal_customer(PDO $db,string $code): array {
+    $c=TransactionService::customerByCode($db,strtoupper($code));
+    if(!$c||!(int)$c['active'])throw new RuntimeException('Customer not found or disabled');
+    if(!Auth::isCustomer((int)$c['id'])){
+        view(__DIR__.'/../views/login.php',['title'=>'Customer Login','c'=>$c,'masked_phone'=>mask_phone((string)$c['phone']),'pay_ui'=>true]);
+    }
+    return $c;
+}
+
+try{
+    $path=route_path();$method=request_method();
+    if($path==='/health'||$path==='/api/health')health_response('customer');
+    $db=Database::pdo();
+    TransactionService::ensureSchema($db);
+
+    // MERCHANT API (Payment Link + API + Webhook)
+    if($path==='/api/v1/payments'&&$method==='POST') MerchantApiService::handleCreate($db);
+    if(preg_match('#^/api/v1/payments/([A-Z0-9]+)$#i',$path,$m)&&$method==='GET') MerchantApiService::handleStatus($db,strtoupper($m[1]));
+
+    if(preg_match('#^/banks/(\d+)/qr$#',$path,$m)&&$method==='GET')BankService::streamQrImage($db,(int)$m[1]);
+
+    if($path==='/'&&$method==='GET'){
+        $go=normalize_code((string)($_GET['code']??''));if($go!=='')redirect('/p/'.$go);
+        view(__DIR__.'/../views/home.php',['title'=>'YEEDIPAY']);
+    }
+
+    // PUBLIC PAYMENT LINK
+    if(preg_match('#^/p/([A-Z0-9]+)$#i',$path,$m)&&$method==='GET'){
+        $c=TransactionService::customerByCode($db,strtoupper($m[1]));if(!$c||!(int)$c['active'])throw new RuntimeException('Customer not found or payment link disabled');
+        $bank=BankService::active($db);$pay_qr=null;
+        if(!empty($_GET['ref'])){$row=TransactionService::txnByRef($db,strtoupper((string)$_GET['ref']));if($row&&(int)$row['customer_id']===(int)$c['id']){$row=TransactionService::refreshCustomerPayment($db,$row);if(strtoupper((string)$row['status'])!=='PENDING')redirect('/p/'.$c['code'].'/result/'.$row['reference']);$pay_qr=$row;}}
+        view(__DIR__.'/../views/payment.php',['title'=>'Pay '.$c['code'],'c'=>$c,'bank'=>$bank,'pending'=>TransactionService::latestPending($db,(int)$c['id']),'presets'=>TransactionService::PRESET_AMOUNTS,'pay_ui'=>true,'pay_qr'=>$pay_qr]);
+    }
+    if(preg_match('#^/p/([A-Z0-9]+)/start$#i',$path,$m)&&$method==='GET')redirect('/p/'.strtoupper($m[1]));
+    if(preg_match('#^/p/([A-Z0-9]+)/start$#i',$path,$m)&&$method==='POST'){
+        require_csrf();$c=TransactionService::customerByCode($db,strtoupper($m[1]));if(!$c||!(int)$c['active'])throw new RuntimeException('Customer not found or disabled');
+        try{$amount=TransactionService::parseEnteredAmount($_POST['amount']??'');$created=TransactionService::createAttempt($db,$c,$amount,trim((string)($_POST['invoice_ref']??'')),'UPI','UNSETTLED',true);redirect('/p/'.$c['code'].'?ref='.$created['reference']);}
+        catch(Throwable $e){view(__DIR__.'/../views/payment.php',['title'=>'Pay '.$c['code'],'c'=>$c,'bank'=>BankService::active($db),'pending'=>TransactionService::latestPending($db,(int)$c['id']),'presets'=>TransactionService::PRESET_AMOUNTS,'pay_ui'=>true,'error'=>$e->getMessage()]);}
+    }
+    if(preg_match('#^/p/([A-Z0-9]+)/result/([A-Z0-9]+)/utr$#i',$path,$m)&&$method==='POST'){
+        require_csrf();$c=TransactionService::customerByCode($db,strtoupper($m[1]));if(!$c)throw new RuntimeException('Customer not found');$t=TransactionService::txnByRef($db,strtoupper($m[2]));if(!$t||(int)$t['customer_id']!==(int)$c['id'])throw new RuntimeException('Payment not found');
+        [$ok,$msg]=TransactionService::reportUtr($db,(string)$t['reference'],(string)($_POST['utr']??''),$_FILES['screenshot']??[],(string)($_POST['email']??''));$t=TransactionService::txnByRef($db,(string)$t['reference'])?:$t;if(strtoupper((string)$t['status'])==='SUCCESS')Auth::customerLogin((int)$c['id']);$recent=TransactionService::recentForCustomer($db,(int)$c['id'],12);
+        view(__DIR__.'/../views/result.php',['title'=>strtoupper((string)$t['status'])==='SUCCESS'?'Payment Successful':'Payment Status','c'=>$c,'t'=>$t,'recent'=>$recent,'pay_ui'=>true,'utr_ok'=>$ok,'utr_error'=>$ok?null:$msg]);
+    }
+    if(preg_match('#^/p/([A-Z0-9]+)/result/([A-Z0-9]+)/screenshot$#i',$path,$m)&&$method==='GET'){$c=TransactionService::customerByCode($db,strtoupper($m[1]));$t=TransactionService::txnByRef($db,strtoupper($m[2]));if(!$c||!$t||(int)$t['customer_id']!==(int)$c['id'])throw new RuntimeException('Payment not found');TransactionService::streamScreenshot($t);}
+    if(preg_match('#^/p/([A-Z0-9]+)/result/([A-Z0-9]+)/invoice\.(pdf|print)$#i',$path,$m)&&$method==='GET'){$c=TransactionService::customerByCode($db,strtoupper($m[1]));$t=TransactionService::txnByRef($db,strtoupper($m[2]));if(!$c||!$t||(int)$t['customer_id']!==(int)$c['id']){http_response_code(404);exit('Payment not found');}if(strtoupper((string)$t['status'])!=='SUCCESS'){http_response_code(404);exit('Invoice is available only after payment success');}if(strtolower($m[3])==='print')InvoiceService::printPage($c,$t);InvoiceService::download($c,$t);}
+    if(preg_match('#^/p/([A-Z0-9]+)/result/([A-Z0-9]+)$#i',$path,$m)&&$method==='GET'){$c=TransactionService::customerByCode($db,strtoupper($m[1]));if(!$c)throw new RuntimeException('Customer not found');$t=TransactionService::txnByRef($db,strtoupper($m[2]));if(!$t||(int)$t['customer_id']!==(int)$c['id'])throw new RuntimeException('Payment not found');$t=TransactionService::refreshCustomerPayment($db,$t);if(strtoupper((string)$t['status'])==='SUCCESS')Auth::customerLogin((int)$c['id']);$recent=TransactionService::recentForCustomer($db,(int)$c['id'],12);view(__DIR__.'/../views/result.php',['title'=>strtoupper((string)$t['status'])==='SUCCESS'?'Payment Successful':'Payment Status','c'=>$c,'t'=>$t,'recent'=>$recent,'pay_ui'=>true]);}
+    if(preg_match('#^/p/([A-Z0-9]+)/qr$#i',$path,$m)&&$method==='GET'){$c=TransactionService::customerByCode($db,strtoupper($m[1]));if(!$c||!(int)$c['active'])throw new RuntimeException('Customer not found');$link=pay_url('/p/'.$c['code']);view(__DIR__.'/../views/permanent_qr.php',['title'=>'Payment Link QR','c'=>$c,'link'=>$link,'pay_ui'=>true]);}
+
+    // PAYMENT STATUS API / CHECKOUT
+    if(preg_match('#^/pay/([A-Z0-9]+)$#i',$path,$m)&&$method==='GET'){$t=TransactionService::txnByRef($db,strtoupper($m[1]));if(!$t)throw new RuntimeException('Transaction not found');$merchant_order=MerchantApiService::orderByTransaction($db,(int)$t['id']);view(__DIR__.'/../views/checkout.php',['title'=>'UPI Payment','t'=>$t,'merchant_order'=>$merchant_order,'pay_ui'=>true]);}
+    if(preg_match('#^/pay/([A-Z0-9]+)/paid$#i',$path,$m)&&$method==='POST'){require_csrf();[$ok,$msg]=TransactionService::reportUtr($db,strtoupper($m[1]),(string)($_POST['utr']??''),$_FILES['screenshot']??[],(string)($_POST['email']??''));$t=TransactionService::txnByRef($db,strtoupper($m[1]));if(!$t)throw new RuntimeException('Transaction not found');$merchant_order=MerchantApiService::orderByTransaction($db,(int)$t['id']);view(__DIR__.'/../views/checkout.php',['title'=>'UPI Payment','t'=>$t,'merchant_order'=>$merchant_order,'pay_ui'=>true,'paid_reported'=>$ok,'error'=>$ok?null:$msg]);}
+    if(preg_match('#^/pay/([A-Z0-9]+)/acknowledge$#i',$path,$m)&&$method==='POST'){require_csrf();$t=TransactionService::acknowledgePaid($db,strtoupper($m[1]));if(!$t)json_response(['ok'=>false,'error'=>'Not found'],404);json_response(TransactionService::statusPayload($t));}
+    if(preg_match('#^/pay/([A-Z0-9]+)/cancel$#i',$path,$m)&&$method==='POST'){require_csrf();$t=TransactionService::cancelByCustomer($db,strtoupper($m[1]));if(!$t)json_response(['ok'=>false,'error'=>'Not found'],404);json_response(TransactionService::statusPayload($t));}
+    if(preg_match('#^/pay/([A-Z0-9]+)/status$#i',$path,$m)&&$method==='GET'){$t=TransactionService::txnByRef($db,strtoupper($m[1]));if(!$t)json_response(['ok'=>false,'error'=>'Not found'],404);$t=TransactionService::refreshCustomerPayment($db,$t);try{MerchantApiService::syncOrderFromTransaction($db,$t);WebhookService::deliverPending($db,3);}catch(Throwable $e){}if(strtoupper((string)$t['status'])==='SUCCESS')Auth::customerLogin((int)$t['customer_id']);json_response(TransactionService::statusPayload($t));}
+
+    // BANK SMS / WEBHOOK
+    if($path==='/api/bank-sms'||$path==='/api/bank-relay/webhook_bank_sms.php'){if($method!=='POST')json_response(['ok'=>false,'error'=>'method_not_allowed'],405);BankSmsService::ingestHttp($db);}
+    if(preg_match('#^/api/banks/([A-Z0-9]+)/webhook$#',$path,$m)&&$method==='POST'){$st=$db->prepare('SELECT * FROM bank_profiles WHERE code=?');$st->execute([$m[1]]);$bank=$st->fetch();if(!$bank)json_response(['ok'=>false,'error'=>'Bank not found'],404);$secret=$_SERVER['HTTP_X_BANK_SECRET']??($_GET['token']??'');if(!$secret||!hash_equals((string)$bank['webhook_secret'],(string)$secret))json_response(['ok'=>false,'error'=>'Unauthorized'],401);$data=json_decode((string)file_get_contents('php://input'),true);if(!is_array($data))json_response(['ok'=>false,'error'=>'Invalid JSON'],400);$get=function(string $dot)use($data){$cur=$data;foreach(explode('.',$dot)as$p){if(!is_array($cur)||!array_key_exists($p,$cur))return null;$cur=$cur[$p];}return $cur;};$in=['reference'=>$get((string)$bank['reference_field'])??($data['reference']??$data['tr']??''),'status'=>$get((string)$bank['status_field'])??($data['status']??''),'amount'=>$get((string)$bank['amount_field']),'upi_txn_id'=>$get((string)$bank['txn_id_field']),'rrn'=>$get((string)$bank['rrn_field']),'payer_vpa'=>$get((string)$bank['payer_vpa_field']),'raw'=>$data];[$ok,$msg]=ReconciliationService::apply($db,$bank,$in,'WEBHOOK');json_response(['ok'=>$ok,'message'=>$msg],$ok?200:400);}
+
+    // LOGIN / LOGOUT
+    if(preg_match('#^/c/([A-Z0-9]+)/request-otp$#i',$path,$m)&&$method==='POST'){require_csrf();$c=TransactionService::customerByCode($db,strtoupper($m[1]));if(!$c||!(int)$c['active'])throw new RuntimeException('Customer not found');try{$db->beginTransaction();$otp=OtpService::create($db,$c);SmsService::sendOtp($db,(string)$c['phone'],$otp);$db->commit();view(__DIR__.'/../views/login.php',['title'=>'Customer Login','c'=>$c,'masked_phone'=>mask_phone((string)$c['phone']),'sent'=>true,'dev_otp'=>((string)Env::get('DEV_SHOW_OTP','0')==='1'?$otp:null),'pay_ui'=>true]);}catch(Throwable $e){if($db->inTransaction())$db->rollBack();view(__DIR__.'/../views/login.php',['title'=>'Customer Login','c'=>$c,'masked_phone'=>mask_phone((string)$c['phone']),'error'=>$e->getMessage(),'pay_ui'=>true]);}}
+    if(preg_match('#^/c/([A-Z0-9]+)/verify-otp$#i',$path,$m)&&$method==='POST'){require_csrf();$c=TransactionService::customerByCode($db,strtoupper($m[1]));if(!$c)throw new RuntimeException('Customer not found');[$ok,$msg]=OtpService::verify($db,$c,trim((string)($_POST['otp']??'')));if(!$ok)view(__DIR__.'/../views/login.php',['title'=>'Customer Login','c'=>$c,'masked_phone'=>mask_phone((string)$c['phone']),'sent'=>true,'error'=>$msg,'pay_ui'=>true]);Auth::customerLogin((int)$c['id']);redirect('/c/'.$c['code']);}
+    if(preg_match('#^/c/([A-Z0-9]+)/logout$#i',$path,$m)){Auth::customerLogout();redirect('/c/'.strtoupper($m[1]));}
+
+    // CUSTOMER DASHBOARD
+    if(preg_match('#^/c/([A-Z0-9]+)$#i',$path,$m)&&$method==='GET'){
+        $c=TransactionService::customerByCode($db,strtoupper($m[1]));if(!$c||!(int)$c['active'])throw new RuntimeException('Customer not found');if(!Auth::isCustomer((int)$c['id']))view(__DIR__.'/../views/login.php',['title'=>'Customer Login','c'=>$c,'masked_phone'=>mask_phone((string)$c['phone']),'pay_ui'=>true]);
+        $period=strtolower(trim((string)($_GET['period']??'month')));if(!in_array($period,['day','week','month','custom'],true))$period='month';$status=strtoupper(trim((string)($_GET['status']??'')));$start=trim((string)($_GET['start']??''));$end=trim((string)($_GET['end']??''));$txns=TransactionService::query($db,(int)$c['id'],$period,$status,null,$start,$end,500);$totals=TransactionService::collectionTotals($db,(int)$c['id']);
+        view(__DIR__.'/../views/dashboard.php',compact('c','period','status','start','end','txns','totals')+['title'=>'Dashboard','nav'=>'dashboard']);
+    }
+    if(preg_match('#^/c/([A-Z0-9]+)/qr$#i',$path,$m)&&$method==='GET'){$c=portal_customer($db,$m[1]);$bank=BankService::active($db);$pending=TransactionService::latestPending($db,(int)$c['id']);view(__DIR__.'/../views/merchant_qr.php',compact('c','bank','pending')+['title'=>'Merchant QR','nav'=>'merchant_qr','presets'=>TransactionService::PRESET_AMOUNTS]);}
+    if(preg_match('#^/c/([A-Z0-9]+)/start$#i',$path,$m)&&$method==='POST'){require_csrf();$c=portal_customer($db,$m[1]);try{$amount=TransactionService::parseEnteredAmount($_POST['amount']??'');$t=TransactionService::createAttempt($db,$c,$amount,trim((string)($_POST['invoice_ref']??'')),'UPI','UNSETTLED',true);redirect('/p/'.$c['code'].'?ref='.$t['reference']);}catch(Throwable $e){$bank=BankService::active($db);$pending=TransactionService::latestPending($db,(int)$c['id']);view(__DIR__.'/../views/merchant_qr.php',compact('c','bank','pending')+['title'=>'Merchant QR','nav'=>'merchant_qr','presets'=>TransactionService::PRESET_AMOUNTS,'error'=>$e->getMessage()]);}}
+
+    if(preg_match('#^/c/([A-Z0-9]+)/statement$#i',$path,$m)&&$method==='GET'){$c=portal_customer($db,$m[1]);$start=trim((string)($_GET['start']??''));$end=trim((string)($_GET['end']??''));$totals=TransactionService::collectionTotals($db,(int)$c['id']);$rows=StatementService::ledgerRows($db,(int)$c['id'],$start,$end);view(__DIR__.'/../views/statement.php',compact('c','start','end','totals','rows')+['title'=>'Account Statement','nav'=>'statement']);}
+    if(preg_match('#^/c/([A-Z0-9]+)/statement\.csv$#i',$path,$m)&&$method==='GET'){$c=portal_customer($db,$m[1]);$rows=TransactionService::query($db,(int)$c['id'],$_GET['period']??'month',strtoupper((string)($_GET['status']??'')),null,$_GET['start']??'',$_GET['end']??'',5000);header('Content-Type:text/csv; charset=utf-8');header('Content-Disposition: attachment; filename="'.$c['code'].'-statement.csv"');$o=fopen('php://output','wb');fwrite($o,"\xEF\xBB\xBF");fputcsv($o,['date','bank','reference','status','requested_amount','confirmed_amount','utr','source','settlement_status']);foreach($rows as$r)fputcsv($o,[$r['created_at'],$r['bank_name'],$r['reference'],$r['status'],$r['requested_amount'],$r['confirmed_amount'],$r['rrn']?:$r['upi_txn_id']?:$r['customer_reported_utr'],$r['confirmation_source'],$r['settlement_status']]);exit;}
+    if(preg_match('#^/c/([A-Z0-9]+)/statement\.pdf$#i',$path,$m)&&$method==='GET'){$c=portal_customer($db,$m[1]);$f=StatementService::filtersFromGet();StatementService::download($c,StatementService::rows($db,(int)$c['id'],$f),$f);}
+
+    if(preg_match('#^/c/([A-Z0-9]+)/billing$#i',$path,$m)&&$method==='GET'){$c=portal_customer($db,$m[1]);$summary=BillingService::customerPlatformSummary($db,(int)$c['id']);$entries=BillingService::customerFeeEntries($db,(int)$c['id']);view(__DIR__.'/../views/billing.php',compact('c','summary','entries')+['title'=>'Platform Fees & GST','nav'=>'billing']);}
+    if(preg_match('#^/c/([A-Z0-9]+)/billing\.csv$#i',$path,$m)&&$method==='GET'){$c=portal_customer($db,$m[1]);BillingService::downloadCustomerFeesCsv($c,BillingService::customerFeeEntries($db,(int)$c['id']));}
+    if(preg_match('#^/c/([A-Z0-9]+)/billing\.pdf$#i',$path,$m)&&$method==='GET'){$c=portal_customer($db,$m[1]);$summary=BillingService::customerPlatformSummary($db,(int)$c['id']);BillingService::downloadCustomerFeesPdf($c,$summary,BillingService::customerFeeEntries($db,(int)$c['id']));}
+
+    if(preg_match('#^/c/([A-Z0-9]+)/tickets$#i',$path,$m)&&$method==='GET'){$c=portal_customer($db,$m[1]);$tickets=TicketService::forCustomer($db,(int)$c['id']);view(__DIR__.'/../views/tickets.php',compact('c','tickets')+['title'=>'Support Tickets','nav'=>'tickets']);}
+    if(preg_match('#^/c/([A-Z0-9]+)/tickets$#i',$path,$m)&&$method==='POST'){require_csrf();$c=portal_customer($db,$m[1]);try{$ticket=TicketService::create($db,$c,$_POST);redirect('/c/'.$c['code'].'/tickets/'.$ticket['id']);}catch(Throwable $e){$tickets=TicketService::forCustomer($db,(int)$c['id']);view(__DIR__.'/../views/tickets.php',compact('c','tickets')+['title'=>'Support Tickets','nav'=>'tickets','error'=>$e->getMessage()]);}}
+    if(preg_match('#^/c/([A-Z0-9]+)/tickets/(\d+)$#i',$path,$m)&&$method==='GET'){$c=portal_customer($db,$m[1]);$ticket=TicketService::get($db,(int)$m[2]);if(!$ticket||(int)$ticket['customer_id']!==(int)$c['id'])throw new RuntimeException('Ticket not found');$replies=TicketService::replies($db,(int)$ticket['id']);view(__DIR__.'/../views/ticket_view.php',compact('c','ticket','replies')+['title'=>'Ticket '.$ticket['reference'],'nav'=>'tickets']);}
+    if(preg_match('#^/c/([A-Z0-9]+)/tickets/(\d+)/reply$#i',$path,$m)&&$method==='POST'){require_csrf();$c=portal_customer($db,$m[1]);$ticket=TicketService::get($db,(int)$m[2]);if(!$ticket||(int)$ticket['customer_id']!==(int)$c['id'])throw new RuntimeException('Ticket not found');try{TicketService::addReply($db,(int)$ticket['id'],'CUSTOMER',(string)$c['name'],(string)($_POST['message']??''));redirect('/c/'.$c['code'].'/tickets/'.$ticket['id']);}catch(Throwable $e){$replies=TicketService::replies($db,(int)$ticket['id']);view(__DIR__.'/../views/ticket_view.php',compact('c','ticket','replies')+['title'=>'Ticket '.$ticket['reference'],'nav'=>'tickets','error'=>$e->getMessage()]);}}
+
+    if(preg_match('#^/c/([A-Z0-9]+)/wallet$#i',$path,$m)&&$method==='GET'){$c=portal_customer($db,$m[1]);$balance=WalletService::balance($db,(int)$c['id']);$recharges=WalletService::rechargesForCustomer($db,(int)$c['id']);$withdrawals=WalletService::withdrawalsForCustomer($db,(int)$c['id']);view(__DIR__.'/../views/wallet.php',compact('c','balance','recharges','withdrawals')+['title'=>'Wallet','nav'=>'wallet']);}
+    if(preg_match('#^/c/([A-Z0-9]+)/wallet/recharge$#i',$path,$m)&&$method==='GET'){$c=portal_customer($db,$m[1]);$bank=BankService::active($db);view(__DIR__.'/../views/wallet_recharge.php',compact('c','bank')+['title'=>'Recharge Wallet','nav'=>'wallet','presets'=>TransactionService::PRESET_AMOUNTS]);}
+    if(preg_match('#^/c/([A-Z0-9]+)/wallet/recharge$#i',$path,$m)&&$method==='POST'){require_csrf();$c=portal_customer($db,$m[1]);try{$amount=TransactionService::parsePresetAmount($_POST['amount']??'');$r=WalletService::startRecharge($db,$c,$amount);redirect('/c/'.$c['code'].'/wallet/recharge/'.$r['txn_reference']);}catch(Throwable $e){$bank=BankService::active($db);view(__DIR__.'/../views/wallet_recharge.php',compact('c','bank')+['title'=>'Recharge Wallet','nav'=>'wallet','presets'=>TransactionService::PRESET_AMOUNTS,'error'=>$e->getMessage()]);}}
+    if(preg_match('#^/c/([A-Z0-9]+)/wallet/recharge/([A-Z0-9]+)$#i',$path,$m)&&$method==='GET'){$c=portal_customer($db,$m[1]);$r=WalletService::getRechargeByTxnRef($db,strtoupper($m[2]));if(!$r||(int)$r['customer_id']!==(int)$c['id'])throw new RuntimeException('Recharge not found');$t=TransactionService::txnByRef($db,strtoupper($m[2]));if(!$t)throw new RuntimeException('Payment not found');$t=TransactionService::refreshCustomerPayment($db,$t);view(__DIR__.'/../views/wallet_recharge_pay.php',compact('c','t','r')+['title'=>'Wallet Recharge','nav'=>'wallet']);}
+    if(preg_match('#^/c/([A-Z0-9]+)/wallet/withdraw$#i',$path,$m)&&$method==='GET'){$c=portal_customer($db,$m[1]);$balance=WalletService::balance($db,(int)$c['id']);view(__DIR__.'/../views/wallet_withdraw.php',compact('c','balance')+['title'=>'Withdraw','nav'=>'wallet']);}
+    if(preg_match('#^/c/([A-Z0-9]+)/wallet/withdraw$#i',$path,$m)&&$method==='POST'){require_csrf();$c=portal_customer($db,$m[1]);$balance=WalletService::balance($db,(int)$c['id']);try{$wd=WalletService::createWithdrawal($db,$c,$_POST);flash('ok','Withdrawal request '.$wd['reference'].' created.');redirect('/c/'.$c['code'].'/wallet');}catch(Throwable $e){view(__DIR__.'/../views/wallet_withdraw.php',compact('c','balance')+['title'=>'Withdraw','nav'=>'wallet','error'=>$e->getMessage()]);}}
+
+    http_response_code(404);echo 'Not Found';
+}catch(Throwable $e){render_uncaught($e,'app.css');}

@@ -1,0 +1,39 @@
+YEEDIPAY MERCHANT API + WEBHOOK PATCH V1
+========================================
+
+NEW FILES
+---------
+app/MerchantApiService.php
+app/WebhookService.php
+database/merchant_api_patch.sql
+tools/create_merchant.php
+tools/process_webhooks.php
+docs/MERCHANT_API_GUIDE.md
+docs/PATCH_INSTRUCTIONS_TELUGU.md
+docs/CUSTOMER_DELIVERY_KIT.md
+docs/CUSTOMER_CREDENTIALS_TEMPLATE.txt
+samples/php/create_payment.php
+samples/php/check_status.php
+samples/php/webhook_receiver.php
+tests/merchant_api_patch_test.php
+tests/merchant_api_unit_test.php
+
+MODIFIED FILES
+--------------
+app/bootstrap.php
+app/ReconciliationService.php
+app/BankSmsService.php
+customer/public/index.php
+customer/views/checkout.php
+database/schema.sql
+.htaccess
+.env.example
+README_BIGROCK.txt
+
+FLOW
+----
+Merchant Website -> POST /api/v1/payments -> Hosted Payment Page -> Bank SMS confirmed SUCCESS -> Signed Webhook -> Return to Merchant.
+
+SUCCESS RULE
+------------
+Customer/merchant supplied UTR never directly creates SUCCESS. Authenticated bank confirmation remains required.

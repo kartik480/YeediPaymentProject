@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>YEEDI Payment</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <main class="card">
+    <div class="brand">YEEDI PAY</div>
+    <h1>Complete your payment</h1>
+    <p id="message" class="message">Checking payment order…</p>
+
+    <section id="paymentBox" class="hidden">
+      <div class="amount" id="amount">₹0.00</div>
+      <div class="meta"><span>Bank</span><strong id="bank">—</strong></div>
+      <div class="meta"><span>Account</span><strong id="account">—</strong></div>
+      <div class="meta"><span>UPI ID</span><strong id="upiId">—</strong></div>
+
+      <div id="qrWrap" class="qr-wrap hidden">
+        <img id="qrImage" alt="Payment QR">
+      </div>
+
+      <p id="initialInstruction" class="instruction">After the UPI app shows payment completed, return here and tap <strong>I HAVE PAID</strong>.</p>
+      <a id="upiButton" class="button secondary hidden" href="#">Open UPI App</a>
+      <button id="paidButton" class="button primary">I HAVE PAID — CHECK NOW</button>
+
+      <div class="status-panel">
+        <span class="dot" id="dot"></span>
+        <strong id="statusText">PENDING</strong>
+        <small id="orderTimer"></small>
+      </div>
+    </section>
+
+    <section id="verificationBox" class="verification hidden" aria-live="polite">
+      <div class="spinner" aria-hidden="true"></div>
+      <div class="verify-head">
+        <h2 id="verifyTitle">Verifying payment</h2>
+        <strong id="verifyCountdown">30s</strong>
+      </div>
+      <p id="verifyMessage">Checking bank confirmation. Please do not refresh or pay again.</p>
+      <div class="progress"><div id="progressBar"></div></div>
+      <div class="checking-dots"><span></span><span></span><span></span> Secure server checking continues automatically</div>
+    </section>
+
+    <section id="successBox" class="success hidden" aria-live="polite">
+      <div class="check">✓</div>
+      <h2>Payment Successful</h2>
+      <p>Your verified bank credit SMS matched this payment.</p>
+      <div class="meta"><span>UTR / RRN</span><strong id="utr">—</strong></div>
+      <div class="meta"><span>Paid at</span><strong id="paidAt">—</strong></div>
+      <p class="delivery">Payment confirmed. Delivery / service can now be released.</p>
+    </section>
+
+    <section id="reviewBox" class="warning hidden">
+      <h2>Verification Required</h2>
+      <p>A bank credit was received, but the server found more than one possible order. Do not pay again. No automatic success was guessed.</p>
+    </section>
+
+    <section id="expiredBox" class="warning hidden">
+      <h2>Payment Window Expired</h2>
+      <p>If you already paid, do not pay again. Delayed bank SMS confirmation can still be handled according to the server grace window.</p>
+    </section>
+
+    <footer>SUCCESS is generated only after verified bank-credit SMS matching. The “I HAVE PAID” button only starts verification.</footer>
+  </main>
+  <script src="config.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

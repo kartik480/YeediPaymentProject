@@ -1,0 +1,12 @@
+YEEDIPAY FINAL V2 HARDENING
+
+Added/changed:
+- 5-minute configurable payment QR TTL
+- merchant order_id/amount idempotency validation
+- webhook localhost/private IP blocking
+- webhook atomic SENDING claim
+- secure session cookie defaults
+- OpenSSL-only new secret encryption
+- BigRock production preflight tool
+- response security headers
+- Telugu final review guide

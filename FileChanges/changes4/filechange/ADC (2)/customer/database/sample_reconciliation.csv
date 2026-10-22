@@ -1,0 +1,2 @@
+status,customer_utr,amount,upi_txn_id,rrn,payer_vpa
+SUCCESS,123456789012,10.00,TXXXXXXXXXXXX,123456789012,payer@upi

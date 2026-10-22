@@ -1,0 +1,21 @@
+# Go-Live Checklist
+- [ ] PHP 8.1+ with PDO MySQL and OpenSSL
+- [ ] MySQL/MariaDB database created
+- [ ] `.env` created; strong `APP_KEY`; DB credentials set
+- [ ] `database/schema.sql` imported
+- [ ] Admin user created
+- [ ] `admin.yeedipay.in` document root points to `admin/public`
+- [ ] `pay.yeedipay.in` document root points to `customer/public`
+- [ ] HTTPS valid on both domains
+- [ ] Cron worker runs every minute
+- [ ] Admin login password changed/tested
+- [ ] Bank QR uploaded and exact VPA/payee verified visually
+- [ ] ₹1 test through customer link succeeds in at least one UPI app
+- [ ] SMS Gateway configured and test SMS received
+- [ ] Customer OTP received
+- [ ] Customer limit test completed
+- [ ] UTR submission + manual SUCCESS reconciliation tested
+- [ ] Duplicate UTR test blocked
+- [ ] CSV reconciliation test completed
+- [ ] 7-day expiry worker verified in staging with a shortened window
+- [ ] MySQL backups configured; optional `bin/backup_mysql.sh` scheduled daily

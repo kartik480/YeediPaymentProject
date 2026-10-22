@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Payment</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div class="top-bar" id="topBar"></div>
+
+  <header id="merchantHeader" class="merchant-header hidden">
+    <img id="merchantLogo" class="merchant-logo" alt="">
+    <span id="merchantName" class="merchant-name"></span>
+  </header>
+
+  <div id="loadingState" class="loading-state">
+    <p id="globalMessage" class="global-message">Loading payment details&hellip;</p>
+  </div>
+
+  <div id="mainContent" class="main-grid hidden">
+    <!-- Left: Steps -->
+    <aside class="steps-panel">
+      <div class="steps-title">
+        <h2>Steps</h2>
+        <span class="audio-icon" title="Audio guide">&#128266;</span>
+      </div>
+      <p><strong>Step 1:</strong> Enter amount</p>
+      <p><strong>Step 2:</strong> Generate QR</p>
+      <p><strong>Step 3:</strong> Scan and pay</p>
+      <p><strong>Step 4:</strong> Click I Have Paid</p>
+    </aside>
+
+    <!-- Center: Payment Card -->
+    <section class="payment-card">
+      <!-- Phase 1: Amount Entry -->
+      <div id="amountPhase">
+        <div id="customerInfo" class="customer-info hidden">
+          <div id="customerName" class="cust-name"></div>
+          <div id="customerId" class="cust-id"></div>
+        </div>
+        <h2 class="card-title">Make Payment</h2>
+        <label class="input-label" for="amountInput">Enter Amount (&#x20B9;)</label>
+        <input type="number" id="amountInput" class="amount-input" min="1" step="1" placeholder="0">
+        <div id="amountDisplay" class="amount-display">INR 0.00</div>
+        <div id="quickAmounts" class="quick-amounts"></div>
+        <button id="payButton" class="btn-pay">Pay</button>
+      </div>
+
+      <!-- Phase 2: Payment Details & Verification -->
+      <div id="paymentPhase" class="hidden">
+        <div class="meta"><span>Amount</span><strong id="pAmount">—</strong></div>
+        <div class="meta"><span>Bank</span><strong id="pBank">—</strong></div>
+        <div class="meta"><span>Account</span><strong id="pAccount">—</strong></div>
+        <div class="meta"><span>UPI ID</span><strong id="pUpiId">—</strong></div>
+
+        <div id="qrWrap" class="qr-wrap hidden">
+          <img id="qrImage" alt="Payment QR">
+        </div>
+
+        <p id="initialInstruction" class="instruction">After the UPI app shows payment completed, return here and tap <strong>I HAVE PAID</strong>.</p>
+        <a id="upiButton" class="btn-secondary hidden" href="#">Open UPI App</a>
+        <button id="paidButton" class="btn-pay">I HAVE PAID &mdash; CHECK NOW</button>
+
+        <div class="status-panel">
+          <span class="dot" id="dot"></span>
+          <strong id="statusText">PENDING</strong>
+          <small id="orderTimer"></small>
+        </div>
+      </div>
+
+      <!-- Verification overlay -->
+      <div id="verificationBox" class="verification hidden" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <div class="verify-head">
+          <h2 id="verifyTitle">Verifying payment</h2>
+          <strong id="verifyCountdown">30s</strong>
+        </div>
+        <p id="verifyMessage">Checking bank confirmation. Please do not refresh or pay again.</p>
+        <div class="progress"><div id="progressBar"></div></div>
+        <div class="checking-dots"><span></span><span></span><span></span> Secure server checking continues automatically</div>
+      </div>
+
+      <!-- Success -->
+      <div id="successBox" class="success hidden" aria-live="polite">
+        <div class="check">&#10003;</div>
+        <h2>Payment Successful</h2>
+        <p>Your verified bank credit SMS matched this payment.</p>
+        <div class="meta"><span>UTR / RRN</span><strong id="utr">—</strong></div>
+        <div class="meta"><span>Paid at</span><strong id="paidAt">—</strong></div>
+        <p class="delivery">Payment confirmed. Delivery / service can now be released.</p>
+      </div>
+
+      <!-- Review -->
+      <div id="reviewBox" class="warning hidden">
+        <h2>Verification Required</h2>
+        <p>A bank credit was received, but the server found more than one possible order. Do not pay again.</p>
+      </div>
+
+      <!-- Expired -->
+      <div id="expiredBox" class="warning hidden">
+        <h2>Payment Window Expired</h2>
+        <p>If you already paid, do not pay again. Delayed bank SMS confirmation can still be handled.</p>
+      </div>
+    </section>
+
+    <!-- Right: Video Guideline -->
+    <aside id="videoPanel" class="video-panel hidden">
+      <h2 class="video-title">Video guideline</h2>
+      <video id="guideVideo" class="guide-video" controls preload="metadata"></video>
+      <p class="video-note">Make a direct payment and never take a screenshot. It does not support.</p>
+    </aside>
+  </div>
+
+  <!-- Support Section -->
+  <section id="supportSection" class="support-section hidden">
+    <p class="support-label">ANY ISSUES? CONTACT SUPPORT</p>
+    <h2 class="support-heading">Any Issues? Contact Us &mdash; Resolved Within 1 Hour</h2>
+    <p class="support-desc">Our support team aims to resolve your issues within 1 hour. Contact us through WhatsApp or email for assistance.</p>
+    <div class="support-cards">
+      <div class="support-card" id="whatsappCard">
+        <div class="support-icon whatsapp-icon">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        </div>
+        <strong>WhatsApp Support</strong>
+        <a id="supportWhatsappLink" href="#" target="_blank" rel="noopener"></a>
+      </div>
+      <div class="support-card" id="emailCard">
+        <div class="support-icon email-icon">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="#EF4444"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+        </div>
+        <strong>Email Support</strong>
+        <a id="supportEmailLink" href="#" target="_blank" rel="noopener"></a>
+      </div>
+    </div>
+  </section>
+
+  <footer class="page-footer">SUCCESS is generated only after verified bank-credit SMS matching. The &ldquo;I HAVE PAID&rdquo; button only starts verification.</footer>
+
+  <script src="config.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

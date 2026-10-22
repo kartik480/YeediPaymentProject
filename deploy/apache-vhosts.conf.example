@@ -1,0 +1,16 @@
+<VirtualHost *:443>
+  ServerName admin.yeedipay.in
+  DocumentRoot /var/www/yeedipay/admin/public
+  <Directory /var/www/yeedipay/admin/public>
+    AllowOverride All
+    Require all granted
+  </Directory>
+</VirtualHost>
+<VirtualHost *:443>
+  ServerName pay.yeedipay.in
+  DocumentRoot /var/www/yeedipay/customer/public
+  <Directory /var/www/yeedipay/customer/public>
+    AllowOverride All
+    Require all granted
+  </Directory>
+</VirtualHost>

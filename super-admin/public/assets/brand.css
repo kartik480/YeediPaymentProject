@@ -1,0 +1,13 @@
+:root{
+  --brand-red:#F0442E;
+  --brand-orange:#FFA500;
+  --brand-ink:#171719;
+  --brand-white:#FFFFFF;
+  --brand-bg:#f5f6f8;
+  --brand-line:#ececef;
+  --brand-muted:#6b6b73;
+  --brand-shadow:0 10px 28px rgba(23,23,25,.06);
+}
+html,body.sa-body{background:var(--brand-bg);color:var(--brand-ink)}
+body{font-family:Inter,"Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--brand-red)}

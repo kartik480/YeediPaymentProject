@@ -1,0 +1,95 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 2854 >>
+stream
+0.070 0.110 0.220 rg
+0.00 774.00 595.00 68.00 re f
+BT /F2 13.00 Tf 0.960 0.770 0.090 rg 1 0 0 1 40.00 818.00 Tm (SIRI ENTERPRISES) Tj ET
+BT /F1 12.00 Tf 0.960 0.970 0.980 rg 1 0 0 1 40.00 794.00 Tm (Payment Success Invoice) Tj ET
+0.930 0.970 0.940 rg
+40.00 690.00 515.00 58.00 re f
+BT /F2 8.00 Tf 0.030 0.450 0.190 rg 1 0 0 1 54.00 728.00 Tm (AMOUNT RECEIVED) Tj ET
+BT /F2 20.00 Tf 0.070 0.110 0.220 rg 1 0 0 1 54.00 704.00 Tm (Rs 1.00) Tj ET
+BT /F2 12.00 Tf 0.030 0.450 0.190 rg 1 0 0 1 482.99 716.00 Tm (SUCCESS) Tj ET
+BT /F1 9.00 Tf 0.400 0.420 0.460 rg 1 0 0 1 40.00 668.00 Tm (Payment ID) Tj ET
+BT /F2 10.00 Tf 0.120 0.160 0.220 rg 1 0 0 1 396.02 668.00 Tm (YDPT0003KKK10091127403F48F2) Tj ET
+0.75 0.76 0.78 RG
+0.6 w
+40.00 662.00 m 555.00 662.00 l S
+BT /F1 9.00 Tf 0.400 0.420 0.460 rg 1 0 0 1 40.00 644.00 Tm (Status) Tj ET
+BT /F2 10.00 Tf 0.820 0.070 0.070 rg 1 0 0 1 531.66 644.00 Tm (PAID) Tj ET
+0.75 0.76 0.78 RG
+0.6 w
+40.00 638.00 m 555.00 638.00 l S
+BT /F1 9.00 Tf 0.400 0.420 0.460 rg 1 0 0 1 40.00 620.00 Tm (Paid at) Tj ET
+BT /F2 10.00 Tf 0.120 0.160 0.220 rg 1 0 0 1 403.80 620.00 Tm (09-10-2026 16:58:19 Asia/Kolkata) Tj ET
+0.75 0.76 0.78 RG
+0.6 w
+40.00 614.00 m 555.00 614.00 l S
+BT /F1 9.00 Tf 0.400 0.420 0.460 rg 1 0 0 1 40.00 596.00 Tm (Customer) Tj ET
+BT /F2 10.00 Tf 0.120 0.160 0.220 rg 1 0 0 1 508.32 596.00 Tm (Suresh Sir) Tj ET
+0.75 0.76 0.78 RG
+0.6 w
+40.00 590.00 m 555.00 590.00 l S
+BT /F1 9.00 Tf 0.400 0.420 0.460 rg 1 0 0 1 40.00 572.00 Tm (Customer code) Tj ET
+BT /F2 10.00 Tf 0.120 0.160 0.220 rg 1 0 0 1 505.54 572.00 Tm (CUST0003) Tj ET
+0.75 0.76 0.78 RG
+0.6 w
+40.00 566.00 m 555.00 566.00 l S
+BT /F1 9.00 Tf 0.400 0.420 0.460 rg 1 0 0 1 40.00 548.00 Tm (Account) Tj ET
+BT /F2 10.00 Tf 0.120 0.160 0.220 rg 1 0 0 1 474.39 548.00 Tm (YD000359841094) Tj ET
+0.75 0.76 0.78 RG
+0.6 w
+40.00 542.00 m 555.00 542.00 l S
+BT /F1 9.00 Tf 0.400 0.420 0.460 rg 1 0 0 1 40.00 524.00 Tm (Bank) Tj ET
+BT /F2 10.00 Tf 0.120 0.160 0.220 rg 1 0 0 1 506.65 524.00 Tm (ICICI Bank) Tj ET
+0.75 0.76 0.78 RG
+0.6 w
+40.00 518.00 m 555.00 518.00 l S
+BT /F1 9.00 Tf 0.400 0.420 0.460 rg 1 0 0 1 40.00 500.00 Tm (Payee) Tj ET
+BT /F2 10.00 Tf 0.120 0.160 0.220 rg 1 0 0 1 456.08 500.00 Tm (K K K ENTERPRISES) Tj ET
+0.75 0.76 0.78 RG
+0.6 w
+40.00 494.00 m 555.00 494.00 l S
+BT /F1 9.00 Tf 0.400 0.420 0.460 rg 1 0 0 1 40.00 476.00 Tm (UPI ID) Tj ET
+BT /F2 10.00 Tf 0.120 0.160 0.220 rg 1 0 0 1 379.82 476.00 Tm (msgreenrisingagrilimited.eazypay@icici) Tj ET
+0.75 0.76 0.78 RG
+0.6 w
+40.00 470.00 m 555.00 470.00 l S
+BT /F1 9.00 Tf 0.400 0.420 0.460 rg 1 0 0 1 40.00 452.00 Tm (UTR) Tj ET
+BT /F2 10.00 Tf 0.120 0.160 0.220 rg 1 0 0 1 488.28 452.00 Tm (664807226545) Tj ET
+0.75 0.76 0.78 RG
+0.6 w
+40.00 446.00 m 555.00 446.00 l S
+BT /F1 8.00 Tf 0.400 0.420 0.460 rg 1 0 0 1 40.00 420.00 Tm (Note: The bill amount is inclusive of applicable GST.) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+6 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000251 00000 n 
+0000003156 00000 n 
+0000003226 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+3301
+%%EOF

@@ -1,0 +1,58 @@
+SET NAMES utf8mb4;
+CREATE TABLE IF NOT EXISTS merchant_accounts (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ customer_id BIGINT UNSIGNED NOT NULL,
+ merchant_id VARCHAR(32) NOT NULL,
+ display_name VARCHAR(180) NOT NULL,
+ mode VARCHAR(12) NOT NULL DEFAULT 'LIVE',
+ api_key_hash CHAR(64) NOT NULL,
+ api_key_hint VARCHAR(24) NOT NULL,
+ api_secret_encrypted TEXT NOT NULL,
+ webhook_secret_encrypted TEXT NOT NULL,
+ webhook_url VARCHAR(500) NULL,
+ return_url VARCHAR(500) NULL,
+ active TINYINT(1) NOT NULL DEFAULT 1,
+ created_at DATETIME NOT NULL,
+ updated_at DATETIME NOT NULL,
+ UNIQUE KEY uq_merchant_id(merchant_id),
+ UNIQUE KEY uq_merchant_api_key(api_key_hash),
+ INDEX idx_merchant_customer(customer_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS merchant_orders (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ merchant_account_id BIGINT UNSIGNED NOT NULL,
+ transaction_id BIGINT UNSIGNED NOT NULL,
+ order_id VARCHAR(80) NOT NULL,
+ amount DECIMAL(14,2) NOT NULL,
+ currency VARCHAR(8) NOT NULL DEFAULT 'INR',
+ buyer_name VARCHAR(180) NULL,
+ buyer_mobile VARCHAR(32) NULL,
+ buyer_email VARCHAR(180) NULL,
+ return_url VARCHAR(500) NULL,
+ status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+ created_at DATETIME NOT NULL,
+ updated_at DATETIME NOT NULL,
+ UNIQUE KEY uq_merchant_order(merchant_account_id,order_id),
+ UNIQUE KEY uq_merchant_transaction(transaction_id),
+ INDEX idx_merchant_order_status(status,id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS merchant_webhook_deliveries (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ event_id VARCHAR(80) NOT NULL,
+ merchant_account_id BIGINT UNSIGNED NOT NULL,
+ merchant_order_id BIGINT UNSIGNED NOT NULL,
+ event_type VARCHAR(64) NOT NULL,
+ webhook_url VARCHAR(500) NOT NULL,
+ payload_json LONGTEXT NOT NULL,
+ signature VARCHAR(128) NOT NULL,
+ status VARCHAR(24) NOT NULL DEFAULT 'PENDING',
+ attempts INT NOT NULL DEFAULT 0,
+ next_retry_at DATETIME NULL,
+ response_code INT NULL,
+ response_body VARCHAR(1000) NULL,
+ last_error VARCHAR(500) NULL,
+ created_at DATETIME NOT NULL,
+ updated_at DATETIME NOT NULL,
+ UNIQUE KEY uq_merchant_webhook_event(event_id),
+ INDEX idx_merchant_webhook_pending(status,next_retry_at,id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

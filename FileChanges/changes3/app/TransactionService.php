@@ -1,0 +1,578 @@
+<?php
+declare(strict_types=1);
+final class TransactionService {
+    private static bool $schemaReady = false;
+
+    public static function ensureSchema(PDO $db): void {
+        if (self::$schemaReady) return;
+        $cust = [];
+        foreach ($db->query('SHOW COLUMNS FROM customers') as $r) $cust[strtolower((string)$r['Field'])] = true;
+        if (!isset($cust['email'])) $db->exec('ALTER TABLE customers ADD COLUMN email VARCHAR(180) NULL');
+        if (!isset($cust['service_activated'])) $db->exec('ALTER TABLE customers ADD COLUMN service_activated TINYINT(1) NOT NULL DEFAULT 0');
+        if (!isset($cust['service_activated_at'])) $db->exec('ALTER TABLE customers ADD COLUMN service_activated_at DATETIME NULL');
+        if (!isset($cust['account_number'])) $db->exec('ALTER TABLE customers ADD COLUMN account_number VARCHAR(24) NULL');
+        $idx = $db->query("SHOW INDEX FROM customers WHERE Key_name='uq_customer_account'")->fetch();
+        if (!$idx) {
+            try { $db->exec('ALTER TABLE customers ADD UNIQUE KEY uq_customer_account(account_number)'); } catch (Throwable $e) {}
+        }
+        $cols = [];
+        foreach ($db->query('SHOW COLUMNS FROM transactions') as $r) $cols[strtolower((string)$r['Field'])] = true;
+        if (!isset($cols['service'])) $db->exec("ALTER TABLE transactions ADD COLUMN service VARCHAR(64) NOT NULL DEFAULT 'UPI'");
+        if (!isset($cols['settlement_status'])) $db->exec("ALTER TABLE transactions ADD COLUMN settlement_status VARCHAR(32) NOT NULL DEFAULT 'UNSETTLED'");
+        if (!isset($cols['invoice_ref'])) $db->exec('ALTER TABLE transactions ADD COLUMN invoice_ref VARCHAR(160) NULL');
+        if (!isset($cols['customer_paid_ack_at'])) $db->exec('ALTER TABLE transactions ADD COLUMN customer_paid_ack_at DATETIME NULL');
+        if (!isset($cols['utr_screenshot_path'])) $db->exec('ALTER TABLE transactions ADD COLUMN utr_screenshot_path VARCHAR(255) NULL');
+        if (!isset($cols['utr_screenshot_orig'])) $db->exec('ALTER TABLE transactions ADD COLUMN utr_screenshot_orig VARCHAR(180) NULL');
+        if (!isset($cols['customer_reported_email'])) $db->exec('ALTER TABLE transactions ADD COLUMN customer_reported_email VARCHAR(180) NULL');
+        if (!isset($cols['customer_reported_utr'])) $db->exec('ALTER TABLE transactions ADD COLUMN customer_reported_utr VARCHAR(160) NULL');
+        if (!isset($cols['customer_reported_at'])) $db->exec('ALTER TABLE transactions ADD COLUMN customer_reported_at DATETIME NULL');
+        if (!isset($cols['upi_txn_id'])) $db->exec('ALTER TABLE transactions ADD COLUMN upi_txn_id VARCHAR(160) NULL');
+        if (!isset($cols['rrn'])) $db->exec('ALTER TABLE transactions ADD COLUMN rrn VARCHAR(160) NULL');
+        if (!isset($cols['payer_vpa'])) $db->exec('ALTER TABLE transactions ADD COLUMN payer_vpa VARCHAR(180) NULL');
+        if (!isset($cols['confirmation_source'])) $db->exec('ALTER TABLE transactions ADD COLUMN confirmation_source VARCHAR(64) NULL');
+        if (!isset($cols['raw_confirmation'])) $db->exec('ALTER TABLE transactions ADD COLUMN raw_confirmation TEXT NULL');
+        $db->exec("UPDATE transactions SET service='UPI' WHERE service IS NULL OR service=''");
+        $db->exec("UPDATE transactions SET settlement_status='N/A' WHERE status IN ('FAILED','EXPIRED') AND settlement_status='UNSETTLED'");
+        AdcLink::ensureSchema($db);
+        BankSmsService::ensureSchema($db);
+        self::$schemaReady = true;
+    }
+
+    public static function customerByCode(PDO $db,string $code): ?array { $st=$db->prepare('SELECT * FROM customers WHERE code=? LIMIT 1');$st->execute([strtoupper($code)]);$r=$st->fetch();return $r?:null; }
+    public static function txnByRef(PDO $db,string $ref): ?array { $st=$db->prepare('SELECT t.*,c.code customer_code,c.name customer_name,c.phone customer_phone,b.bank_name,b.payee_name,b.vpa,b.qr_payload,b.qr_image_path,b.signed_qr FROM transactions t JOIN customers c ON c.id=t.customer_id JOIN bank_profiles b ON b.id=t.bank_id WHERE t.reference=?');$st->execute([$ref]);$r=$st->fetch();return $r?:null; }
+    public static function newCustomerCode(PDO $db): string { $n=(int)$db->query('SELECT COUNT(*) FROM customers')->fetchColumn()+1;while(true){$code='CUST'.str_pad((string)$n,4,'0',STR_PAD_LEFT);$st=$db->prepare('SELECT 1 FROM customers WHERE code=?');$st->execute([$code]);if(!$st->fetchColumn())return $code;$n++;} }
+    public const PRESET_AMOUNTS = [1, 100, 1000, 2000, 5000, 10000, 20000, 50000, 100000];
+    public const PUBLIC_PAY_AMOUNTS = [100, 500, 1000, 2000, 5000, 10000, 25000, 50000];
+    public const CHECK_STATUS_SECONDS = 20;
+    public const PAID_VERIFY_SECONDS = 30;
+
+    public static function parsePresetAmount(mixed $raw): float {
+        $s = trim((string)$raw);
+        if ($s === '' || !preg_match('/^\d+(?:\.\d{1,2})?$/', $s)) {
+            throw new InvalidArgumentException('Select an amount');
+        }
+        $n = (int)round((float)$s);
+        if (!in_array($n, self::PRESET_AMOUNTS, true)) {
+            throw new InvalidArgumentException('Amount must be one of the listed options');
+        }
+        return (float)$n;
+    }
+
+    public static function parseEnteredAmount(mixed $raw): float {
+        $s = str_replace(',', '', trim((string)$raw));
+        if ($s === '' || !preg_match('/^\d+(?:\.\d{1,2})?$/', $s)) {
+            throw new InvalidArgumentException('Enter a valid amount');
+        }
+        $n = round((float)$s, 2);
+        if ($n < 1 || $n > 200000) {
+            throw new InvalidArgumentException('Amount must be between ₹1 and ₹2,00,000');
+        }
+        return $n;
+    }
+
+    public static function recentForCustomer(PDO $db, int $customerId, int $limit = 12): array {
+        $st = $db->prepare('SELECT t.*,b.bank_name FROM transactions t JOIN bank_profiles b ON b.id=t.bank_id WHERE t.customer_id=? ORDER BY t.id DESC LIMIT '.max(1, min(50, $limit)));
+        $st->execute([$customerId]);
+        return $st->fetchAll();
+    }
+
+    public static function latestPending(PDO $db, int $customerId): ?array {
+        self::expireDuePayments($db);
+        $st = $db->prepare("SELECT t.*,c.code customer_code,c.name customer_name,b.bank_name,b.payee_name,b.vpa,b.qr_payload,b.qr_image_path,b.signed_qr FROM transactions t JOIN customers c ON c.id=t.customer_id JOIN bank_profiles b ON b.id=t.bank_id WHERE t.customer_id=? AND t.status='PENDING' ORDER BY t.id DESC LIMIT 1");
+        $st->execute([$customerId]);
+        $r = $st->fetch();
+        return $r ?: null;
+    }
+
+    /**
+     * The customer picks a round amount. The QR collects 2 to 50 paise less
+     * when that still leaves at least ₹1, because GPay hides the bank list
+     * for anything under ₹1. A ₹1 selection therefore stays ₹1.
+     */
+    public static function collectAmount(PDO $db, array $bank, float $selected): float {
+        $selectedPaise = (int)round($selected * 100);
+        $low = max(100, $selectedPaise - 50);
+        $high = $selectedPaise - 2;
+        if ($high < $low) {
+            return round($selected, 2);
+        }
+        $used = [];
+        $vpa = strtolower(trim((string)($bank['vpa'] ?? '')));
+        if ($vpa !== '') {
+            $st = $db->prepare("SELECT t.requested_amount
+                                FROM transactions t
+                                JOIN bank_profiles b ON b.id=t.bank_id
+                                WHERE t.status='PENDING' AND t.requested_amount IS NOT NULL AND LOWER(b.vpa)=?");
+            $st->execute([$vpa]);
+        } else {
+            $st = $db->prepare("SELECT requested_amount FROM transactions WHERE status='PENDING' AND bank_id=? AND requested_amount IS NOT NULL");
+            $st->execute([(int)($bank['id'] ?? 0)]);
+        }
+        foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $amt) {
+            $used[number_format((float)$amt, 2, '.', '')] = true;
+        }
+        $span = $high - $low + 1;
+        for ($i = 0; $i < min(40, $span); $i++) {
+            $key = number_format(random_int($low, $high) / 100, 2, '.', '');
+            if (!isset($used[$key])) return (float)$key;
+        }
+        for ($paise = $high; $paise >= $low; $paise--) {
+            $key = number_format($paise / 100, 2, '.', '');
+            if (!isset($used[$key])) return (float)$key;
+        }
+        return (float)number_format($high / 100, 2, '.', '');
+    }
+
+    public static function isExactPreset(float $amount, array $presets, mixed $mode): bool {
+        if ((string)$mode !== 'preset') return false;
+        foreach ($presets as $preset) {
+            if (abs($amount - (float)$preset) < 0.001) return true;
+        }
+        return false;
+    }
+
+    public static function createAttempt(PDO $db,array $c,?float $amount, ?string $invoiceRef = null, string $service = 'UPI', string $settlementStatus = 'UNSETTLED', bool $exactAmount = false): array {
+        self::ensureSchema($db);
+        $bank=BankService::active($db);if(!$bank)throw new RuntimeException('No active bank is configured.');[$ok,$msg]=LimitService::check($db,$c,$amount);if(!$ok)throw new RuntimeException($msg);
+        $svc = strtoupper(trim($service)) ?: 'UPI';
+        if ($amount !== null && $svc !== 'WALLET_RECHARGE' && !$exactAmount) {
+            $listed = false;
+            foreach (self::PUBLIC_PAY_AMOUNTS as $preset) {
+                if (abs((float)$amount - (float)$preset) < 0.001) {
+                    $amount = (float)$preset;
+                    $listed = true;
+                    break;
+                }
+            }
+            if (!$listed) $amount = self::collectAmount($db, $bank, (float)$amount);
+        }
+        $ref=random_reference($c['code'],$bank['code']);$intent=PaymentConfirmService::intentForAttempt($bank,$amount,$ref);
+        if ($amount !== null && str_starts_with(strtolower(trim($intent)), 'upi:')) {
+            $parsedIntent = BankService::parseUpiUri($intent);
+            $intentAmount = trim((string)($parsedIntent['params']['am'] ?? ''));
+            if ($intentAmount !== '' && is_numeric($intentAmount) && abs((float)$intentAmount - (float)$amount) > 0.009) {
+                throw new RuntimeException('Bank QR amount does not match the requested amount. Configure a compatible dynamic/unsigned QR or use the QR fixed amount.');
+            }
+        }
+        $invoice = trim((string)$invoiceRef);
+        if (strlen($invoice) > 160) $invoice = substr($invoice, 0, 160);
+        $amt = $amount===null?null:number_format($amount,2,'.','');
+        $settle = strtoupper(trim($settlementStatus)) ?: 'UNSETTLED';
+        $st=$db->prepare("INSERT INTO transactions(customer_id,bank_id,reference,status,requested_amount,intent_uri,limit_breach,limit_note,service,settlement_status,invoice_ref,created_at,updated_at) VALUES(?,?,?,'PENDING',?,?,0,'',?,?,?,UTC_TIMESTAMP(),UTC_TIMESTAMP())");
+        $st->execute([$c['id'],$bank['id'],$ref,$amt,$intent,$svc,$settle,$invoice!==''?$invoice:null]);
+        $id=(int)$db->lastInsertId();
+        SmsService::enqueueTxn($db,$id,'PENDING');
+        $linked = AdcLink::attach($db, $ref, $bank, $amount);
+        return ['id'=>$id,'reference'=>$ref,'bank'=>$bank,'intent'=>$intent,'adc'=>$linked];
+    }
+
+    /** @return array<string,mixed>|null */
+    public static function acknowledgePaid(PDO $db, string $reference): ?array {
+        self::ensureSchema($db);
+        $reference = strtoupper(trim($reference));
+        $t = self::txnByRef($db, $reference);
+        if (!$t) return null;
+        $t = self::syncPaymentWindow($db, $t);
+        if (strtoupper((string)$t['status']) !== 'PENDING' || BankSmsService::qrSecondsLeft($t) <= 0) {
+            return self::syncPaymentWindow($db, $t);
+        }
+
+        if (strtoupper((string)$t['status']) === 'PENDING' && empty($t['customer_paid_ack_at'])) {
+            $db->prepare("UPDATE transactions
+                          SET customer_paid_ack_at=UTC_TIMESTAMP(), updated_at=UTC_TIMESTAMP()
+                          WHERE reference=? AND status='PENDING' AND customer_paid_ack_at IS NULL")
+               ->execute([$reference]);
+            $t = self::txnByRef($db, $reference) ?: $t;
+        }
+
+        if (strtoupper((string)($t['status'] ?? '')) === 'PENDING' && !empty($t['customer_paid_ack_at'])) {
+            try {
+                $t = BankSmsService::matchAcknowledgedTransaction($db, $t);
+            } catch (Throwable $e) {
+                error_log('Bank SMS amount match after acknowledgement failed: '.$e->getMessage());
+                $t = self::txnByRef($db, $reference) ?: $t;
+            }
+        }
+        if (strtoupper((string)($t['status'] ?? '')) === 'SUCCESS') {
+            return $t;
+        }
+        $db->prepare("UPDATE transactions
+                      SET status='FAILED',
+                          confirmation_source='NOT_CONFIRMED',
+                          settlement_status='N/A',
+                          limit_breach=0,
+                          limit_note='',
+                          updated_at=UTC_TIMESTAMP()
+                      WHERE reference=? AND status='PENDING'")
+           ->execute([$reference]);
+        try { WalletService::onTransactionClosed($db, (int)($t['id'] ?? 0), 'FAILED'); } catch (Throwable $e) {}
+        return self::txnByRef($db, $reference) ?: $t;
+    }
+
+    /** Close every pending payment whose configured QR window has elapsed. */
+    public static function expireDuePayments(PDO $db): void {
+        $seconds = BankSmsService::qrTtlSeconds();
+        $db->prepare("UPDATE transactions
+                      SET status='EXPIRED',
+                          confirmation_source=COALESCE(NULLIF(confirmation_source,''),'PAYMENT_WINDOW'),
+                          settlement_status='N/A',
+                          limit_breach=0,
+                          limit_note='',
+                          updated_at=UTC_TIMESTAMP()
+                      WHERE status='PENDING'
+                        AND customer_paid_ack_at IS NULL
+                        AND created_at <= DATE_SUB(UTC_TIMESTAMP(), INTERVAL ? SECOND)")
+           ->execute([$seconds]);
+        try {
+            $db->exec("UPDATE wallet_recharges w
+                       JOIN transactions t ON t.id=w.transaction_id
+                       SET w.status='EXPIRED'
+                       WHERE w.status='PENDING' AND t.status='EXPIRED'");
+        } catch (Throwable $e) {
+        }
+    }
+
+    /** @param array<string,mixed> $t @return array<string,mixed> */
+    public static function syncPaymentWindow(PDO $db, array $t): array {
+        self::expireDuePayments($db);
+        $ref = strtoupper(trim((string)($t['reference'] ?? '')));
+        if ($ref === '') return $t;
+        return self::txnByRef($db, $ref) ?: $t;
+    }
+
+    /** @return array<string,mixed>|null */
+    public static function cancelByCustomer(PDO $db, string $reference): ?array {
+        $reference = strtoupper(trim($reference));
+        $t = self::txnByRef($db, $reference);
+        if (!$t) return null;
+        $t = self::syncPaymentWindow($db, $t);
+        if (strtoupper((string)$t['status']) !== 'PENDING') return $t;
+        $db->prepare("UPDATE transactions
+                      SET status='FAILED',
+                          confirmation_source='CUSTOMER_CANCEL',
+                          settlement_status='N/A',
+                          limit_breach=0,
+                          limit_note='',
+                          updated_at=UTC_TIMESTAMP()
+                      WHERE id=? AND status='PENDING'")
+           ->execute([(int)$t['id']]);
+        try { WalletService::onTransactionClosed($db, (int)$t['id'], 'FAILED'); } catch (Throwable $e) {}
+        return self::txnByRef($db, $reference) ?: $t;
+    }
+
+    /**
+     * Match a still-open payment, then close it when the configured QR window has elapsed.
+     * @param array<string,mixed> $t
+     * @return array<string,mixed>
+     */
+    public static function refreshCustomerPayment(PDO $db, array $t): array {
+        $ref = (string)($t['reference'] ?? '');
+        try { AdcLink::syncReference($db, $ref); } catch (Throwable $e) {}
+        $t = self::txnByRef($db, $ref) ?: $t;
+        $t = self::syncPaymentWindow($db, $t);
+        if (strtoupper((string)($t['status'] ?? '')) === 'PENDING'
+            && !empty($t['customer_paid_ack_at'])) {
+            try {
+                $t = BankSmsService::matchAcknowledgedTransaction($db, $t);
+            } catch (Throwable $e) {
+                error_log('Bank SMS match during status refresh failed: '.$e->getMessage());
+                $t = self::txnByRef($db, $ref) ?: $t;
+            }
+        }
+        $t = PaymentConfirmService::refresh($db, $t);
+        return self::syncPaymentWindow($db, $t);
+    }
+
+    /** @param array<string,mixed> $t @return array{code:string,label:string} */
+    public static function customerOutcome(array $t): array {
+        $status = strtoupper((string)($t['status'] ?? ''));
+        $source = strtoupper((string)($t['confirmation_source'] ?? ''));
+        if ($status === 'SUCCESS') return ['code' => 'paid', 'label' => 'PAID'];
+        if ($status === 'EXPIRED') return ['code' => 'expired', 'label' => 'Session Expired'];
+        if ($status === 'FAILED' && str_starts_with($source, 'CUSTOMER_CANCEL')) return ['code' => 'cancelled', 'label' => 'Payment Cancelled'];
+        if ($status === 'FAILED') return ['code' => 'failed', 'label' => 'Payment Failed'];
+        if ($status === 'PENDING' && empty($t['customer_paid_ack_at']) && BankSmsService::qrSecondsLeft($t) <= 0) return ['code' => 'expired', 'label' => 'Session Expired'];
+        return ['code' => 'pending', 'label' => ''];
+    }
+
+    /** @param array<string,mixed> $t @return array<string,mixed> */
+    public static function statusPayload(array $t): array {
+        $v = self::verificationState($t);
+        $outcome = self::customerOutcome($t);
+        return [
+            'ok' => true,
+            'reference' => $t['reference'],
+            'status' => $t['status'],
+            'view' => BankSmsService::customerView($t),
+            'outcome' => $outcome['code'],
+            'outcome_label' => $outcome['label'],
+            'receipt' => $outcome['code'] === 'paid',
+            'verification_state' => $v['state'],
+            'customer_acknowledged' => $v['acknowledged'],
+            'verification_remaining_seconds' => $v['remaining'],
+            'verification_buffer_seconds' => self::PAID_VERIFY_SECONDS,
+            'customer_message' => $outcome['label'] !== '' ? $outcome['label'] : $v['message'],
+            'sms_match' => (string)($t['sms_match'] ?? ''),
+            'amount' => (string)($t['confirmed_amount'] ?? $t['requested_amount'] ?? ''),
+            'utr' => BankSmsService::displayUtr($t),
+            'expires_in' => BankSmsService::qrSecondsLeft($t),
+            'limit_breach' => (bool)($t['limit_breach'] ?? false),
+        ];
+    }
+
+    /** @return array{state:string,acknowledged:bool,remaining:int,message:string} */
+    public static function verificationState(array $t): array {
+        $status = strtoupper((string)($t['status'] ?? ''));
+        $outcome = self::customerOutcome($t);
+        if ($status === 'SUCCESS') return ['state'=>'CONFIRMED','acknowledged'=>true,'remaining'=>0,'message'=>'Payment confirmed successfully.'];
+        if ($outcome['code'] === 'expired') return ['state'=>'EXPIRED','acknowledged'=>!empty($t['customer_paid_ack_at']),'remaining'=>0,'message'=>'Session Expired'];
+        if ($outcome['code'] === 'cancelled') return ['state'=>'CANCELLED','acknowledged'=>!empty($t['customer_paid_ack_at']),'remaining'=>0,'message'=>'Payment Cancelled'];
+        if ($outcome['code'] === 'failed') return ['state'=>'FAILED','acknowledged'=>!empty($t['customer_paid_ack_at']),'remaining'=>0,'message'=>'Payment Failed'];
+        if (strtoupper((string)($t['sms_match'] ?? '')) === 'REVIEW_REQUIRED') return ['state'=>'REVIEW_REQUIRED','acknowledged'=>!empty($t['customer_paid_ack_at']),'remaining'=>0,'message'=>'Payment needs manual verification. Do not pay again.'];
+        $ack = trim((string)($t['customer_paid_ack_at'] ?? ''));
+        if ($ack === '') return ['state'=>'AWAITING_PAYMENT','acknowledged'=>false,'remaining'=>0,'message'=>'Scan the QR code and make payment and after payment success please press the I HAVE PAID button.'];
+        $ts = strtotime($ack.' UTC');
+        if ($ts === false) $ts = time();
+        $remaining = max(0, self::PAID_VERIFY_SECONDS - max(0, time() - $ts));
+        if ($remaining > 0) return ['state'=>'VERIFYING','acknowledged'=>true,'remaining'=>$remaining,'message'=>'Checking bank confirmation. Please do not refresh or pay again.'];
+        return ['state'=>'WAITING_BANK_SMS','acknowledged'=>true,'remaining'=>0,'message'=>'Bank SMS is delayed. We are continuing verification. Please do not pay again.'];
+    }
+
+    public static function checkWaitLeft(array $t, int $waitSeconds = self::CHECK_STATUS_SECONDS): int {
+        if (strtoupper((string)($t['status'] ?? '')) !== 'PENDING') {
+            return 0;
+        }
+        $created = strtotime((string)($t['created_at'] ?? '').' UTC');
+        if ($created === false) {
+            return $waitSeconds;
+        }
+        return max(0, $waitSeconds - (time() - $created));
+    }
+
+    public static function isValidUtr(string $utr): bool {
+        return (bool)preg_match('/^[0-9]{12}$/', $utr) || (bool)preg_match('/^[A-Z0-9]{12,16}$/', $utr);
+    }
+
+    public static function assignAccountNumber(PDO $db, int $customerId): string {
+        self::ensureSchema($db);
+        $st = $db->prepare('SELECT account_number FROM customers WHERE id=?');
+        $st->execute([$customerId]);
+        $existing = trim((string)$st->fetchColumn());
+        if ($existing !== '') {
+            return $existing;
+        }
+        $chk = $db->prepare('SELECT 1 FROM customers WHERE account_number=?');
+        do {
+            $acc = 'YD'.str_pad((string)$customerId, 4, '0', STR_PAD_LEFT).str_pad((string)random_int(0, 99999999), 8, '0', STR_PAD_LEFT);
+            $chk->execute([$acc]);
+        } while ($chk->fetchColumn());
+        $db->prepare("UPDATE customers SET account_number=? WHERE id=? AND (account_number IS NULL OR account_number='')")->execute([$acc, $customerId]);
+        $st->execute([$customerId]);
+        $saved = trim((string)$st->fetchColumn());
+        return $saved !== '' ? $saved : $acc;
+    }
+
+    public static function screenshotAbsPath(array $t): ?string {
+        $rel = trim((string)($t['utr_screenshot_path'] ?? ''));
+        if ($rel === '') return null;
+        $root = realpath(YEEDIPAY_ROOT) ?: YEEDIPAY_ROOT;
+        $abs = realpath($root.DIRECTORY_SEPARATOR.str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $rel));
+        $dir = realpath($root.DIRECTORY_SEPARATOR.'storage'.DIRECTORY_SEPARATOR.'utr_screenshots');
+        if (!$abs || !$dir || !str_starts_with($abs, $dir.DIRECTORY_SEPARATOR) || !is_file($abs)) {
+            return null;
+        }
+        return $abs;
+    }
+
+    public static function streamScreenshot(array $t): never {
+        $abs = self::screenshotAbsPath($t);
+        if (!$abs) {
+            http_response_code(404);
+            exit('Screenshot not found');
+        }
+        $mime = (string)(new finfo(FILEINFO_MIME_TYPE))->file($abs);
+        if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) {
+            $mime = 'application/octet-stream';
+        }
+        header('Content-Type: '.$mime);
+        header('Content-Length: '.(string)filesize($abs));
+        header('Cache-Control: private, max-age=3600');
+        header('X-Content-Type-Options: nosniff');
+        readfile($abs);
+        exit;
+    }
+
+    /** @return array{0:string,1:string} */
+    private static function storeScreenshot(array $file, int $txnId): array {
+        $err = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
+        if ($err === UPLOAD_ERR_NO_FILE || empty($file['tmp_name'])) {
+            throw new InvalidArgumentException('Upload a payment screenshot from your UPI app');
+        }
+        if ($err === UPLOAD_ERR_INI_SIZE || $err === UPLOAD_ERR_FORM_SIZE) {
+            throw new InvalidArgumentException('Screenshot is too large (max 5 MB)');
+        }
+        if ($err !== UPLOAD_ERR_OK || !is_uploaded_file((string)$file['tmp_name'])) {
+            throw new InvalidArgumentException('Screenshot upload failed. Try again.');
+        }
+        if ((int)($file['size'] ?? 0) > 5 * 1024 * 1024) {
+            throw new InvalidArgumentException('Screenshot is too large (max 5 MB)');
+        }
+        $mime = (string)(new finfo(FILEINFO_MIME_TYPE))->file((string)$file['tmp_name']);
+        $ext = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'][$mime] ?? '';
+        if ($ext === '') {
+            throw new InvalidArgumentException('Screenshot must be a JPG, PNG, or WEBP image');
+        }
+        $dir = YEEDIPAY_ROOT.'/storage/utr_screenshots';
+        if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
+            throw new InvalidArgumentException('Could not save screenshot. Try again.');
+        }
+        $name = $txnId.'_'.bin2hex(random_bytes(8)).'.'.$ext;
+        $dest = $dir.'/'.$name;
+        if (!move_uploaded_file((string)$file['tmp_name'], $dest)) {
+            throw new InvalidArgumentException('Could not save screenshot. Try again.');
+        }
+        $orig = basename((string)($file['name'] ?? 'screenshot.'.$ext));
+        $orig = substr(preg_replace('/[^A-Za-z0-9._-]/', '_', $orig) ?? 'screenshot', 0, 180);
+        return ['storage/utr_screenshots/'.$name, $orig];
+    }
+
+    public static function reportUtr(PDO $db, string $ref, string $utr, array $upload = [], string $email = ''): array {
+        self::ensureSchema($db);
+        $utr = normalize_utr($utr);
+        if (!self::isValidUtr($utr)) return [false, 'Enter a valid UTR / UPI transaction ID'];
+        $email = strtolower(trim($email));
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) return [false, 'Enter a valid email ID'];
+        $t = self::txnByRef($db, $ref);
+        if (!$t) return [false, 'Transaction not found'];
+        if (strtoupper((string)$t['status']) !== 'PENDING') return [strtoupper((string)$t['status']) === 'SUCCESS', 'Payment is already '.strtoupper((string)$t['status'])];
+        if (!empty($t['customer_reported_utr']) && !hash_equals((string)$t['customer_reported_utr'], $utr)) return [false, 'A UTR is already saved. Contact support for correction.'];
+        $q=$db->prepare('SELECT reference FROM transactions WHERE (customer_reported_utr=? OR rrn=? OR upi_txn_id=?) AND id<>? LIMIT 1');
+        $q->execute([$utr,$utr,$utr,$t['id']]); if($q->fetchColumn()) return [false,'This UTR is already linked to another payment'];
+        $shotPath=trim((string)($t['utr_screenshot_path']??''));$shotOrig=trim((string)($t['utr_screenshot_orig']??''));
+        if($shotPath===''&&!empty($upload['tmp_name'])&&(int)($upload['error']??UPLOAD_ERR_NO_FILE)===UPLOAD_ERR_OK){try{[$shotPath,$shotOrig]=self::storeScreenshot($upload,(int)$t['id']);}catch(Throwable $e){$shotPath='';$shotOrig='';}}
+        $db->prepare("UPDATE transactions SET customer_reported_utr=?,customer_reported_email=CASE WHEN ?='' THEN customer_reported_email ELSE ? END,customer_reported_at=UTC_TIMESTAMP(),customer_paid_ack_at=COALESCE(customer_paid_ack_at,UTC_TIMESTAMP()),utr_screenshot_path=COALESCE(NULLIF(?,''),utr_screenshot_path),utr_screenshot_orig=COALESCE(NULLIF(?,''),utr_screenshot_orig),updated_at=UTC_TIMESTAMP() WHERE id=?")
+           ->execute([$utr,$email,$email,$shotPath,$shotOrig,$t['id']]);
+        if($email!=='')$db->prepare("UPDATE customers SET email=? WHERE id=? AND (email IS NULL OR email='')")->execute([$email,(int)$t['customer_id']]);
+        $fresh=self::txnByRef($db,$ref)?:$t;
+        try{$fresh=BankSmsService::matchAcknowledgedTransaction($db,$fresh);}catch(Throwable $e){Log::write('payment','utr_match_failed',['reference'=>$ref,'error'=>$e->getMessage()]);}
+        $fresh=self::txnByRef($db,$ref)?:$fresh;
+        if(strtoupper((string)($fresh['status']??''))==='SUCCESS') return [true,'Payment confirmed by authenticated bank SMS.'];
+        return [false,'UTR saved. Waiting for authenticated bank SMS confirmation. Do not pay again.'];
+    }
+    public static function query(PDO $db,?int $customerId,string $period,string $status='',?int $bankId=null,string $start='',string $end='',int $limit=1000): array {
+        $where=[];$args=[];if($customerId){$where[]='t.customer_id=?';$args[]=$customerId;}if($status!==''){$where[]='t.status=?';$args[]=strtoupper($status);}if($bankId){$where[]='t.bank_id=?';$args[]=$bankId;}[$s,$e]=local_period_bounds($period,$start,$end);if($s){$where[]='t.created_at>=?';$args[]=$s;}if($e){$where[]='t.created_at<?';$args[]=$e;}$sql='SELECT t.*,c.code customer_code,c.name customer_name,c.phone customer_phone,b.bank_name,b.code bank_code FROM transactions t JOIN customers c ON c.id=t.customer_id JOIN bank_profiles b ON b.id=t.bank_id'.($where?' WHERE '.implode(' AND ',$where):'').' ORDER BY t.id DESC LIMIT '.max(1,min(5000,$limit));$st=$db->prepare($sql);$st->execute($args);return $st->fetchAll();
+    }
+
+    public static function search(PDO $db, array $f, int $limit = 2000): array {
+        self::ensureSchema($db);
+        $where = [];
+        $args = [];
+        $status = strtoupper(trim((string)($f['status'] ?? '')));
+        if ($status !== '') { $where[] = 't.status=?'; $args[] = $status; }
+        $bankId = (int)($f['bank_id'] ?? 0);
+        if ($bankId > 0) { $where[] = 't.bank_id=?'; $args[] = $bankId; }
+        $q = trim((string)($f['q'] ?? ''));
+        if ($q !== '') {
+            $like = '%'.$q.'%';
+            $where[] = '(c.code LIKE ? OR c.name LIKE ? OR c.phone LIKE ? OR IFNULL(c.email,\'\') LIKE ? OR t.reference LIKE ? OR IFNULL(t.rrn,\'\') LIKE ? OR IFNULL(t.customer_reported_utr,\'\') LIKE ?)';
+            array_push($args, $like, $like, $like, $like, $like, $like, $like);
+        }
+        $start = trim((string)($f['start'] ?? ''));
+        $end = trim((string)($f['end'] ?? ''));
+        if ($start !== '' && $end === '') $end = $start;
+        if ($start === '' && $end !== '') $start = $end;
+        if ($start !== '' && $end !== '') {
+            [$s, $e] = local_period_bounds('custom', $start, $end);
+            if ($s) { $where[] = 't.created_at>=?'; $args[] = $s; }
+            if ($e) { $where[] = 't.created_at<?'; $args[] = $e; }
+        }
+        $sql = 'SELECT t.*,c.code customer_code,c.name customer_name,c.phone customer_phone,c.email customer_email,b.bank_name,b.code bank_code FROM transactions t JOIN customers c ON c.id=t.customer_id JOIN bank_profiles b ON b.id=t.bank_id'.($where ? ' WHERE '.implode(' AND ', $where) : '').' ORDER BY t.id DESC LIMIT '.max(1, min(5000, $limit));
+        $st = $db->prepare($sql);
+        $st->execute($args);
+        return $st->fetchAll();
+    }
+
+    public static function displayAmount(array $t): string {
+        $amt = $t['confirmed_amount'] ?? null;
+        if ($amt === null || $amt === '') $amt = $t['requested_amount'] ?? null;
+        return $amt === null || $amt === '' ? '' : amount_fmt($amt);
+    }
+
+    /** @return array{success:float,pending:float,rejected:float} */
+    public static function dashboardTotals(array $txns): array {
+        $success = 0.0;
+        $pending = 0.0;
+        $rejected = 0.0;
+        foreach ($txns as $t) {
+            $st = strtoupper((string)($t['status'] ?? ''));
+            if ($st === 'SUCCESS') {
+                $success += (float)($t['confirmed_amount'] ?? $t['requested_amount'] ?? 0);
+            } elseif ($st === 'PENDING') {
+                $pending += (float)($t['requested_amount'] ?? 0);
+            } elseif ($st === 'FAILED') {
+                $rejected += (float)($t['requested_amount'] ?? 0);
+            }
+        }
+        return ['success' => $success, 'pending' => $pending, 'rejected' => $rejected];
+    }
+
+    /** @return array{confirmed:float,pending:float,refunded:float,settled:float,ledger_balance:float} */
+    public static function collectionTotals(PDO $db, int $customerId): array {
+        self::ensureSchema($db);
+
+        // IMPORTANT ACCOUNTING RULES:
+        // 1) PENDING is only a pending collection; it does not change ledger balance.
+        // 2) FAILED / EXPIRED are failed attempts, NOT refunds.
+        // 3) Only SUCCESS contributes to confirmed collections.
+        // 4) A SUCCESS transaction marked SETTLED is debited from customer ledger balance.
+        // 5) This build has no dedicated bank-confirmed refund ledger table, therefore refunded=0.
+        //    When a real refund ledger is introduced, read only bank-confirmed refund entries there.
+        $st = $db->prepare("SELECT
+            COALESCE(SUM(CASE WHEN status='SUCCESS' THEN COALESCE(confirmed_amount,requested_amount,0) ELSE 0 END),0) confirmed,
+            COALESCE(SUM(CASE WHEN status='PENDING' THEN COALESCE(requested_amount,0) ELSE 0 END),0) pending,
+            COALESCE(SUM(CASE WHEN status='SUCCESS' AND COALESCE(settlement_status,'UNSETTLED')='SETTLED' THEN COALESCE(confirmed_amount,requested_amount,0) ELSE 0 END),0) settled
+            FROM transactions
+            WHERE customer_id=?");
+        $st->execute([$customerId]);
+        $row = $st->fetch() ?: [];
+
+        // Round monetary totals at the reporting boundary.
+        $confirmed = round((float)($row['confirmed'] ?? 0), 2);
+        $pending = round((float)($row['pending'] ?? 0), 2);
+        $refunded = 0.00;
+        $settled = round((float)($row['settled'] ?? 0), 2);
+        $ledger = round($confirmed - $settled - $refunded, 2);
+
+        return [
+            'confirmed' => $confirmed,
+            'pending' => $pending,
+            'refunded' => $refunded,
+            'settled' => $settled,
+            'ledger_balance' => $ledger,
+        ];
+    }
+
+    public static function scanUri(array $t): string {
+        $vpa = trim((string)($t['vpa'] ?? ''));
+        $amt = $t['requested_amount'] ?? null;
+        $amount = ($amt !== null && $amt !== '' && (float)$amt > 0) ? (float)$amt : null;
+        if ($vpa !== '' && $amount !== null) {
+            return BankService::customerAmountIntent([
+                'vpa' => $vpa,
+                'payee_name' => (string)($t['payee_name'] ?? ''),
+                'bank_name' => (string)($t['bank_name'] ?? ''),
+                'mcc' => (string)($t['mcc'] ?? ''),
+                'qr_payload' => (string)($t['qr_payload'] ?? ''),
+            ], $amount, (string)($t['reference'] ?? ''));
+        }
+        return (string)($t['intent_uri'] ?? '');
+    }
+
+    public static function usesUploadedBankQr(array $t): bool {
+        return false;
+    }
+
+    public static function bankQrUrl(array $t): string {
+        return url('/banks/'.(int)($t['bank_id'] ?? 0).'/qr');
+    }
+}

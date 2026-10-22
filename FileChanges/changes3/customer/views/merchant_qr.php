@@ -1,0 +1,10 @@
+<?php include __DIR__.'/_portal_head.php'; ?>
+<h1 class="col-title">Merchant QR / Collect Payment</h1>
+<?php if(!empty($error)): ?><div class="error"><?=e($error)?></div><?php endif; ?>
+<?php if(!$bank): ?><div class="error">No active bank is configured. Add/enable a real bank profile before accepting payments.</div><?php else: ?>
+<div class="col-panel cust-qr-panel"><div class="cust-qr-meta"><div><span class="label">Permanent YEEDIPAY QR</span><b>Same QR for your customers</b></div><div><span class="label">Public Link</span><b><?=e(pay_url('/p/'.$c['code']))?></b></div><div><span class="label">Routing</span><b>Automatic 30-minute backend rotation</b></div></div><div id="merchantLinkQr" class="qrbox cust-qr-wrap" data-logo="<?=e(brand_logo_url())?>"></div><p class="cust-qr-link"><?=e(pay_url('/p/'.$c['code']))?></p><p class="col-note">This public QR never changes. Each new payment is assigned to the backend QR active at that moment and remains locked to that QR for the life of the transaction.</p></div>
+<div class="col-panel"><h2 class="col-section-title">Create Collection</h2><form method="post" action="<?=e(url('/c/'.$c['code'].'/start'))?>"><?=csrf_field()?><div class="col-filter-form"><label>Amount ₹<input name="amount" type="number" min="1" max="200000" step="0.01" required></label><label>Invoice / Order Ref<input name="invoice_ref" maxlength="160"></label><div class="col-filter-actions"><button class="col-btn-gold">GENERATE PAYMENT QR</button><a class="col-btn-outline" href="<?=e(url('/p/'.$c['code']))?>" target="_blank">Open Public Pay Page</a></div></div></form></div>
+<?php if($pending): ?><div class="warn">Pending payment: <b><?=e($pending['reference'])?></b> · ₹<?=number_format((float)$pending['requested_amount'],2)?></div><?php endif; ?>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script><script src="<?=e(asset_url('qr-brand.js'))?>"></script><script>var q=document.getElementById('merchantLinkQr');if(q&&window.yeediQr)yeediQr(q,<?=json_encode(pay_url('/p/'.$c['code']))?>,230);</script>
+<?php endif; ?>
+<?php include __DIR__.'/_portal_foot.php'; ?>

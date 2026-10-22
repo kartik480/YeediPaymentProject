@@ -1,0 +1,20 @@
+{
+    "logs": [
+        {
+            "outputFile": "in.yeedipay.bankrelay.app-mergeDebugResources-27:/values-v28/values-v28.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\HP\\AppData\\Local\\Temp\\cursor-sandbox-cache\\126d58f6c2e3d26b35acfaf560a7115c\\gradle\\caches\\9.2.0\\transforms\\4172d8fb6bdb8b04c23161a7fc3d529b\\workspace\\transformed\\appcompat-1.8.0\\res\\values-v28\\values-v28.xml",
+                    "from": {
+                        "startLines": "2,3,4,8",
+                        "startColumns": "4,4,4,4",
+                        "startOffsets": "55,130,217,397",
+                        "endLines": "2,3,7,11",
+                        "endColumns": "74,86,12,12",
+                        "endOffsets": "125,212,392,584"
+                    }
+                }
+            ]
+        }
+    ]
+}

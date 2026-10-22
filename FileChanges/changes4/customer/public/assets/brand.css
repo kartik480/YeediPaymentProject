@@ -1,0 +1,90 @@
+:root{
+  --brand-red:#F0442E;
+  --brand-orange:#FFA500;
+  --brand-ink:#171719;
+  --brand-white:#FFFFFF;
+  --brand-line:#ececef;
+  --brand-shadow:0 10px 28px rgba(23,23,25,.06);
+}
+html,body{background:var(--brand-white);color:var(--brand-ink)}
+body{font-family:Inter,"Segoe UI",system-ui,sans-serif}
+a{color:var(--brand-red)}
+.top{background:var(--brand-ink)}
+.card,.pay-dark .pay{
+  background:#fff;
+  color:var(--brand-ink);
+  border:1px solid var(--brand-line);
+  border-radius:18px;
+  box-shadow:var(--brand-shadow);
+}
+.pay-dark .pay{padding:18px 16px 16px}
+button,.btn,button.pay-go,a.pay-go{
+  background:linear-gradient(90deg,#F0442E,#FFA500);
+  color:#fff;
+  border:0;
+  border-radius:12px;
+  font-weight:800;
+  box-shadow:0 8px 18px rgba(240,68,46,.18);
+}
+button.pay-go:disabled{opacity:.55;cursor:not-allowed;filter:none}
+.btn2,button.pay-chip,button.pay-share-btn,#cancelBtn,.pay-quiet{
+  background:#fff;
+  color:var(--brand-ink);
+  border:1px solid var(--brand-line);
+  box-shadow:none;
+}
+button.pay-chip.on{border-color:var(--brand-red);color:var(--brand-red);background:#fff6f4}
+.pay-dark,.pay-dark .wrap,body.pay-dash,html:has(body.pay-dark),html:has(body.pay-dash){background:#fff;color:var(--brand-ink)}
+.yp-merchant-pay.pay-dark{background:transparent;box-shadow:none}
+.pay-who,.pay-who div,.pay-lab,.pay-lim,.pay-route,.pay-scan,.pay-more a,.pay-title{color:var(--brand-ink)}
+.pay-who div,.pay-lim,.pay-route,.pay-more a{color:#6b6b73}
+.pay-inr,.pay-instant,.pay-amt-lab{color:var(--brand-red)}
+.pay-lab input,.pay-amtbox,.pay-dark .txn-filters select,.pay-dark .txn-filters input{
+  background:#fff;
+  color:var(--brand-ink);
+  border:1px solid #e4e4e8;
+  border-radius:10px;
+}
+.pay-lab input:focus{outline:2px solid rgba(240,68,46,.22);border-color:var(--brand-red)}
+.pay-upi,.pay-pending,.pay-hist,.dash-acc,.money-card{
+  background:#fff;
+  color:var(--brand-ink);
+  border:1px solid var(--brand-line);
+  box-shadow:var(--brand-shadow);
+}
+.pay-pending{border-left:4px solid var(--brand-orange)}
+.pay-pending div,.dash-acc .sub,.money-sub,.pay-hist-sub{color:#6b6b73}
+.pay-copy{background:var(--brand-ink);box-shadow:none}
+.pay-dark .error{background:#fff1ef;color:#9f1239}
+.pay-ok{background:#f3fbf6;border:1px solid #b7e4c7;color:var(--brand-ink)}
+.pay-ok-mark{background:#16a34a;color:#fff}
+.pay-hist-row{border-bottom-color:var(--brand-line)}
+.br-table th{color:var(--brand-red);border-bottom-color:var(--brand-line)}
+.br-table td{color:var(--brand-ink);border-bottom-color:var(--brand-line)}
+.pay-dark .status-PENDING{color:#c47b00}
+.pay-dark .status-SUCCESS{color:#15803d}
+.pay-dark .status-FAILED,.pay-dark .status-EXPIRED{color:var(--brand-red)}
+.money-card .value,.dash-acc .value{color:var(--brand-red)}
+.dash-acc .label{color:var(--brand-orange)}
+.brand-lockup{text-align:center;margin:8px auto 20px}
+.brand-lockup img{display:block;height:auto;width:min(420px,92%);max-width:100%;margin:0 auto}
+.pay-timer{background:#fff;color:var(--brand-ink);border:2px solid #F0442E}
+.pay-timer b,.pay-pop-amt{color:var(--brand-red)}
+.pay-verify-card,.pay-pop-card{background:#fff;color:var(--brand-ink);border:1px solid var(--brand-line);box-shadow:var(--brand-shadow)}
+.pay-pop-card{border-color:#F0442E}
+.pay-verify-card p,.pay-pop-card p{color:#3a3a40}
+.pay-spin{border-color:#f3d2cb;border-top-color:#F0442E}
+.pay-share-btn{background:#fff;color:var(--brand-ink);border:1px solid var(--brand-line)}
+img,video,canvas{max-width:100%}
+.pay-dark .wrap,.wrap{max-width:100%}
+.pay-dark .pay{max-width:430px;margin-left:auto;margin-right:auto}
+@media(max-width:700px){
+  table{min-width:0}
+  .brand-lockup img{width:min(340px,92%)}
+  .pay-dark .pay{padding:14px 12px}
+  .top{padding:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .pay-chips{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pay-who{overflow-wrap:anywhere}
+  .money-grid,.money-grid-3,.col-stats,.dash-facts{grid-template-columns:1fr}
+  input,select,textarea{font-size:16px}
+}

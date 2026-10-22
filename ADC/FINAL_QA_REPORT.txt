@@ -1,0 +1,33 @@
+YEEDI V5 FINAL 30-SECOND QA — FINAL CHECKED BUILD
+
+PASS: PHP syntax for Server Core
+PASS: Bank SMS parser harness 20/20 cases
+PASS: Android XML parsing
+PASS: Customer dashboard JavaScript syntax
+PASS: Required API/module files present
+PASS: 30-second verification config present
+PASS: VERIFYING and WAITING_BANK_SMS server states present
+PASS: Customer animated verification UI present
+PASS: HMAC request authentication present for merchant + Android relay
+PASS: Exact sender-ID allowlist is fail-closed
+PASS: Account-last4 check is fail-closed by default
+PASS: Duplicate SMS/reference protection present
+PASS: Late SMS uses original received_at for matching
+PASS: Same-amount collision slot remains reserved through post-expiry SMS grace window
+PASS: Customer I HAVE PAID cannot create SUCCESS
+PASS: delivery_ready becomes true only after verified SMS SUCCESS
+
+FINAL REVIEW FIX APPLIED:
+- Collision guard previously released an exact-amount slot at nominal order expiry even though the old order was still matchable during the post-expiry SMS grace period.
+- Fixed: PENDING/EXPIRED same-amount orders keep the slot reserved through the configured late-SMS grace period, preventing avoidable overlap/REVIEW_REQUIRED cases.
+
+IMPORTANT PRODUCTION LIMITATION (BY DESIGN):
+- If two customers must simultaneously pay the exact same amount (for example ₹500) into the same receiving account and the bank SMS does not carry a YEEDI order identifier, automatic unique attribution is impossible from amount/account/time alone. The collision guard therefore blocks the second overlapping ₹500 slot on that receiving account. Use multiple receiving accounts, unique payable amounts, or a stronger bank-side reference/API if high same-amount concurrency is required.
+
+Environment-specific items not live-tested here:
+- Real ICICI / IndusInd / RBL sender IDs and actual SMS text variants
+- Real bank SIM delivery delay
+- Production HTTPS/domain
+- Production MySQL credentials/data and migration on the live DB
+- Android signed APK build/install on a real phone
+- Real ₹1 / ₹10 / ₹500 end-to-end UAT

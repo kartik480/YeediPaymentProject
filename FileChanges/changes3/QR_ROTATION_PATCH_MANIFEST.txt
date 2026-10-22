@@ -1,0 +1,25 @@
+YEEDIPAY 30-MINUTE MULTI-QR ROTATION PATCH
+
+PATCH FILES
+app/BankService.php
+customer/views/merchant_qr.php
+database/qr_rotation_30min_patch.sql
+database/schema.sql
+tools/qr_pool.php
+tests/qr_rotation_patch_test.php
+docs/QR_ROTATION_30MIN_PATCH_TELUGU.md
+QR_ROTATION_PATCH_MANIFEST.txt
+
+BEHAVIOUR
+- Unlimited enabled backend QR profiles are supported by bank_profiles.
+- Every enabled QR receives a 30-minute rotation slot.
+- Customer-facing permanent QR remains the same YEEDIPAY /p/CUSTxxxx link QR.
+- Each created transaction persists its selected bank_id, locking the route.
+- SMS/reconciliation continues matching against the transaction bank_id.
+
+INSTALL
+1. Backup files and database.
+2. Copy/overwrite patch files into the project root.
+3. Import database/qr_rotation_30min_patch.sql.
+4. Add/enable QR profiles and run: php tools/qr_pool.php enable-auto
+5. Keep using the existing customer permanent QR.

@@ -1,0 +1,13 @@
+#Tue Oct 13 12:06:13 IST 2026
+path.3=classes.dex
+path.2=6/classes.dex
+path.1=0/classes.dex
+path.0=classes.dex
+base.3=C\:\\Users\\HP\\Desktop\\BIGHG\\BIG\\ADC\\01_ANDROID_SMS_RELAY_APP\\app\\build\\intermediates\\global_synthetics_dex\\debug\\mergeDebugGlobalSynthetics\\classes.dex
+base.2=C\:\\Users\\HP\\Desktop\\BIGHG\\BIG\\ADC\\01_ANDROID_SMS_RELAY_APP\\app\\build\\intermediates\\dex\\debug\\mergeProjectDexDebug\\6\\classes.dex
+base.1=C\:\\Users\\HP\\Desktop\\BIGHG\\BIG\\ADC\\01_ANDROID_SMS_RELAY_APP\\app\\build\\intermediates\\dex\\debug\\mergeProjectDexDebug\\0\\classes.dex
+base.0=C\:\\Users\\HP\\Desktop\\BIGHG\\BIG\\ADC\\01_ANDROID_SMS_RELAY_APP\\app\\build\\intermediates\\dex\\debug\\mergeExtDexDebug\\classes.dex
+renamed.3=classes4.dex
+renamed.2=classes3.dex
+renamed.1=classes2.dex
+renamed.0=classes.dex

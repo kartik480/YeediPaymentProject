@@ -1,0 +1,17 @@
+YEEDIPAY DEMO SMS GATEWAY SETTINGS
+
+Gateway Name: YEEDIPAY Demo SMS Gateway
+Endpoint URL: https://sms-demo.yeedipay.in/send.php
+HTTP Method: POST
+Content Type: json
+Auth Header Name: Authorization
+Auth Prefix: Bearer 
+Auth Token: 42e8907d0c27dcaab8c2219577b3d24c
+Sender ID: YEEDIPAY
+Request Template:
+{"phone":"{phone}","message":"{message}","sender_id":"{sender_id}","template_id":"{template_id}"}
+
+Inbox:
+https://sms-demo.yeedipay.in/inbox.php?key=42e8907d0c27dcaab8c2219577b3d24c
+
+NOTE: Demo only. Logs SMS on server; does NOT send a real SMS to a mobile.

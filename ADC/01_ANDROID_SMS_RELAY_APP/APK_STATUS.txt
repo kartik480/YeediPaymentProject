@@ -1,0 +1,3 @@
+This package contains the Android Studio source project for the YEEDI Bank SMS Relay.
+A production APK must be built and signed with the organisation's Android signing key.
+This environment does not contain the Android SDK/signing keystore, so no signed APK binary is included.

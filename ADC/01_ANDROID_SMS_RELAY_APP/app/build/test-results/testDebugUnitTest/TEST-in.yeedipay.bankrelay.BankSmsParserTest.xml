@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="in.yeedipay.bankrelay.BankSmsParserTest" tests="23" skipped="0" failures="0" errors="0" timestamp="2026-09-30T08:40:10.549Z" hostname="DESKTOP-2BF9A0F" time="0.039">
+  <properties/>
+  <testcase name="ignoresPendingTransaction" classname="in.yeedipay.bankrelay.BankSmsParserTest" time="0.012"/>
+  <testcase name="ignoresDebitEvenWhenReceivedAppearsAtEnd" classname="in.yeedipay.bankrelay.BankSmsParserTest" time="0.001"/>
+  <testcase name="parsesIciciCreditAfterVerb" classname="in.yeedipay.bankrelay.BankSmsParserTest" time="0.005"/>
+  <testcase name="rejectsUpiCreditWithoutReference" classname="in.yeedipay.bankrelay.BankSmsParserTest" time="0.001"/>
+  <testcase name="ignoresWillBeCredited" classname="in.yeedipay.bankrelay.BankSmsParserTest" time="0.001"/>
+  <testcase name="creditWithSecurityFooterIsStillAccepted" classname="in.yeedipay.bankrelay.BankSmsParserTest" time="0.001"/>
+  <testcase name="ignoresNonUpiCredit" classname="in.yeedipay.bankrelay.BankSmsParserTest" time="0.001"/>
+  <testcase name="rejectsUpiCreditWithoutAccountDigits" classname="in.yeedipay.bankrelay.BankSmsParserTest" time="0.001"/>
+  <testcase name="ignoresUpiCollectRequestReceived" classname="in.yeedipay.bankrelay.BankSmsParserTest" time="0.001"/>
+  <testcase name="ignoresCreditedBackFailedTransaction" classname="in.yeedipay.bankrelay.BankSmsParserTest" time="0.0"/>
+  <testcase name="parsesAmountBeforeReceivedAndDoesNotUseAccountLast4" classname="in.yeedipay.bankrelay.BankSmsParserTest" time="0.001"/>
+  <testcase name="ignoresCashbackCredit" classname="in.yeedipay.bankrelay.BankSmsParserTest" time="0.001"/>
+  <testcase name="parsesIndusIndCredit" classname="in.yeedipay.bankrelay.BankSmsParserTest" time="0.001"/>
+  <testcase name="ignoresUnknownSender" classname="in.yeedipay.bankrelay.BankSmsParserTest" time="0.0"/>
+  <testcase name="ignoresRefundWillBeCredited" classname="in.yeedipay.bankrelay.BankSmsParserTest" time="0.001"/>
+  <testcase name="parsesUpiTxnIdReference" classname="in.yeedipay.bankrelay.BankSmsParserTest" time="0.003"/>
+  <testcase name="ignoresActualOtpCode" classname="in.yeedipay.bankrelay.BankSmsParserTest" time="0.0"/>
+  <testcase name="parsesPaymentReceivedPositive" classname="in.yeedipay.bankrelay.BankSmsParserTest" time="0.001"/>
+  <testcase name="parsesIciciCreditWithoutUpiWord" classname="in.yeedipay.bankrelay.BankSmsParserTest" time="0.001"/>
+  <testcase name="ignoresRequestToPayReceived" classname="in.yeedipay.bankrelay.BankSmsParserTest" time="0.0"/>
+  <testcase name="ignoresDebitEvenWhenRequestReceivedAppears" classname="in.yeedipay.bankrelay.BankSmsParserTest" time="0.0"/>
+  <testcase name="ignoresDebitOnly" classname="in.yeedipay.bankrelay.BankSmsParserTest" time="0.0"/>
+  <testcase name="parsesSlashUpiReference" classname="in.yeedipay.bankrelay.BankSmsParserTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

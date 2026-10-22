@@ -1,0 +1,6 @@
+YEEDI_SMS_AUTO_V5_FINAL_30SEC_FINAL_CHECKED
+Base: YEEDI_SMS_RELAY_SMS_AUTO_FINAL_V5
+Enhancement: 30-second customer verification buffer + delayed SMS waiting state
+Modules: Android SMS Relay / Server Core / Customer Payment Dashboard
+Success authority: verified bank CREDIT SMS only
+Final-check fix: same-amount collision guard retains slot through late-SMS grace window

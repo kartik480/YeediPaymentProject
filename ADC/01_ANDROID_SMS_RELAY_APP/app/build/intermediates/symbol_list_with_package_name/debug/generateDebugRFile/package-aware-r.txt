@@ -1,0 +1,14 @@
+in.yeedipay.bankrelay
+id deviceIdInput
+id endpointInput
+id iciciLast4Input
+id indusindLast4Input
+id permissionButton
+id rblLast4Input
+id saveButton
+id secretInput
+id statusText
+id testButton
+layout activity_main
+string app_name
+style Theme_YeediBankRelay

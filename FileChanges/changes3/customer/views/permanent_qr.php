@@ -1,0 +1,3 @@
+<?php include __DIR__.'/_head.php'; ?>
+<div class="pay" style="text-align:center"><h1>YEEDIPAY Payment Link QR</h1><p><?=e($c['name'])?> · <?=e($c['code'])?></p><div class="pay-qrwrap"><div id="linkQr" class="qrbox" data-logo="<?=e(brand_logo_url())?>"></div></div><p class="mono" style="word-break:break-all"><?=e($link)?></p><a class="pay-go" style="display:block;text-decoration:none" href="<?=e($link)?>">OPEN PAYMENT PAGE</a></div><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script><script src="<?=e(asset_url('qr-brand.js'))?>"></script><script>var q=document.getElementById('linkQr');if(q&&window.yeediQr)yeediQr(q,<?=json_encode($link)?>,260);</script>
+<?php include __DIR__.'/_foot.php'; ?>
