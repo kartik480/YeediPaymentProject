@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # YEEDIPAY — PHP + HTML + MySQL Final Package
 
 This is the PHP/MySQL port of the final exact-bank-QR YEEDIPAY design.
@@ -31,7 +32,7 @@ Admin and customer share the same `app/` layer, `.env`, and MySQL. Creating a cu
 
 **Local (one server, both sides):**
 ```bash
-cp .env.example .env
+cp .env.example .envac
 # set DB_*, APP_KEY, and SESSION_COOKIE_SECURE=false for http://localhost
 php bin/install.php
 php bin/create_admin.php admin 'Use-A-Strong-Password-Here'
@@ -63,3 +64,6 @@ Customer permanent QR and desktop bank QR are rendered in the browser using qrco
 Opening a UPI app is not proof of credit. Transactions remain PENDING until Admin/bank-record reconciliation (or an optional future bank webhook) confirms SUCCESS/FAILED. Unverified PENDING attempts become EXPIRED after the configured 7-day window.
 
 See `docs/FUNCTION_MATRIX.md` and `deploy/cpanel.md`.
+=======
+# YeediPaymentProject
+>>>>>>> 71f2737e3e0c0b5576f175f424e672ed6a6bc367
